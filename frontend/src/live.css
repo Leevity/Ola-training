@@ -20,6 +20,7 @@
     transform: rotate(360deg);
   }
 }
+.mobile-connection-error { display: flow-root; }
 .mobile-error {
   margin: 16px;
   padding: 14px;

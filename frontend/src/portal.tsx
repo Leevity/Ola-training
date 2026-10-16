@@ -76,19 +76,28 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     if(request===overviewRequest.current)setData(next);
     return next;
   };
+  const loadConnection = async () => {
+    const request = ++overviewRequest.current;
+    const nextSession = await api.me();
+    const nextData = await api.overview();
+    if (request === overviewRequest.current) {
+      setSession(nextSession);
+      setData(nextData);
+    }
+  };
   const connect = async () => {
+    sessionChanging.current=true;
     setLoading(true);
     setError("");
     try {
-      const result = await api.me();
-      setSession(result);
-      await loadOverview();
+      await loadConnection();
     } catch (e) {
       if (e instanceof api.ApiError && e.status === 401) {
         setSession(null);
         setData(null);
       } else setError((e as Error).message);
     } finally {
+      sessionChanging.current=false;
       setLoading(false);
     }
   };
@@ -134,7 +143,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     );
   if (error)
     return (
-      <div className="app-shell">
+      <div className="app-shell mobile-connection-error">
         <ErrorState message={error} retry={() => void connect()} />
       </div>
     );
@@ -157,8 +166,23 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     },
     changeTenant: async (id) => {
       if (!allowLeaving()) return;
-      sessionChanging.current=true;overviewRequest.current++;setLoading(true);
-      try{await api.switchTenant(id);await connect();location.hash='/home';}finally{sessionChanging.current=false;setLoading(false);}
+      if (sessionChanging.current) return;
+      sessionChanging.current=true;overviewRequest.current++;setLoading(true);setError('');
+      let switched = false;
+      try {
+        await api.switchTenant(id);
+        switched = true;
+        setData(null);
+        await loadConnection();
+        location.hash='/home';
+      } catch (e) {
+        const message = e instanceof Error ? e.message : '服务暂时不可用，请重试。';
+        const tenantName = session.tenants.find(tenant=>tenant.id===(switched?id:session.user.tenantId))?.shortName||'当前企业';
+        setError(switched ? `已切换到${tenantName}，但学习数据加载失败，请重试。${message}` : `未能确认企业切换结果，上次确认的企业为${tenantName}。请重试连接。${message}`);
+        throw e;
+      } finally {
+        sessionChanging.current=false;setLoading(false);
+      }
     },
   };
   return (
