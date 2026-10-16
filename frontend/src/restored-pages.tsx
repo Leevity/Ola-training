@@ -57,7 +57,7 @@ export function HomePage({ go }: Nav) {
     candidate && percent(candidate, data) > 0 ? candidate : undefined;
   const banners = [
     {
-      image: "home-banner.webp",
+      image: "home-banner-mobile.webp",
       title: "AI 助力成长",
       sub: "每天进步一点点",
     },
@@ -253,7 +253,7 @@ export function CourseCenter({
               <h1>课程中心</h1>
               <p>AI 赋能成长，成就更好的你</p>
             </div>
-            <img src={asset("course-center-hero.png")} alt="" />
+            <img src={asset("course-center-hero.webp")} alt="" />
           </div>
           <div className="main-tabs">
             {kinds.map((k) => (
@@ -713,7 +713,7 @@ export function MyPage({ go }: Nav) {
     <Page tab="my" go={go} className="my-page">
       <div className="my-hero">
         <div className="my-person">
-          <img src={asset("default-avatar.png")} alt="" />
+          <img src={asset("default-avatar.webp")} alt="" />
           <div>
             <strong>{session.user.name}</strong>
             <small>{session.user.department} · 每一步都向前</small>

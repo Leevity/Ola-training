@@ -419,7 +419,7 @@ function Workspace({
                 {unread > 0 && <i>{unread > 9 ? '9+' : unread}</i>}
               </button>
               <button className="avatar-button" onClick={() => go('/my')} aria-label="个人中心">
-                <img src="/assets/default-avatar.png" alt="" />
+                <img src="/assets/default-avatar.webp" alt="" />
                 <span>{session.user.name}</span>
               </button>
             </div>

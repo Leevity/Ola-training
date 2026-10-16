@@ -294,7 +294,7 @@ export function RankPage({ go, back }: Nav) {
               {podium.map((m, i) => (
                 <div className={`podium-place place-${i}`} key={m.id}>
                   <Trophy className="podium-trophy" size={22} />
-                  <img src={asset("default-avatar.png")} alt="" />
+                  <img src={asset("default-avatar.webp")} alt="" />
                   <strong>{m.name}</strong>
                   <small>{m.department}</small>
                   <b>
@@ -312,7 +312,7 @@ export function RankPage({ go, back }: Nav) {
               <b>
                 第 <strong>{me.rank}</strong> 名
               </b>
-              <img src={asset("default-avatar.png")} alt="" />
+              <img src={asset("default-avatar.webp")} alt="" />
               <div>
                 <strong>{me.name}</strong>
                 <small>{me.department}</small>
@@ -324,7 +324,7 @@ export function RankPage({ go, back }: Nav) {
             {list.map((m) => (
               <div key={m.id}>
                 <b>{m.rank}</b>
-                <img src={asset("default-avatar.png")} alt="" />
+                <img src={asset("default-avatar.webp")} alt="" />
                 <span>
                   <strong>
                     {m.name}

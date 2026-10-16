@@ -874,7 +874,7 @@ export function Profile({ onPasswordChanged }: { onPasswordChanged: () => void }
     <>
       <PageTitle title="个人中心" description="查看学习记录，记录每一次进步。" />
       <section className="profile-hero">
-        <img src="/assets/default-avatar.png" alt="" />
+        <img src="/assets/default-avatar.webp" alt="" />
         <div>
           <span className="eyebrow">我的学习档案</span>
           <h1>{user.name}</h1>
