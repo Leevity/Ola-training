@@ -13,6 +13,7 @@ import { buildApp } from '../src/app.ts';
 import type { Config } from '../src/config.ts';
 import { signBridge } from '../src/integration.ts';
 import { callModel, loadProvider } from '../src/ai-provider.ts';
+import { inspectWidgetOutput } from '../src/generation-diagnostics.ts';
 import { extractMaterial } from '../src/material-parser.ts';
 import JSZip from 'jszip';
 import { olaTrainingAuthentication } from '../../OpenMAIC/lib/server/identity/host/ola-training.ts';
@@ -34,8 +35,8 @@ test('模型配置按企业隔离、密钥加密与保留、真实传输适配�
  assert.equal((await request(root,'PUT',endpoint,{baseUrl:'https://example.com/v1',model:'model'})).statusCode,400);
  assert.equal((await request(root,'PUT',endpoint,{baseUrl:'https://user:password@example.com/v1',model:'model',apiKey:'secret'})).statusCode,400);
  await assert.rejects(()=>callModel({...config,production:true},{baseUrl:'https://127.0.0.1/v1',model:'model',apiKey:'secret'},'test','test'),(e:any)=>e.status===400);
- let calls=0;const secret='only-test-secret-never-return';
- const server=createServer((req,res)=>{let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{calls++;assert.equal(req.headers.authorization,`Bearer ${secret}`);assert.equal(req.url,'/v1/chat/completions');assert.equal(JSON.parse(body).model,'test-model');res.setHeader('content-type','application/json');res.end(JSON.stringify({choices:[{message:{content:'OK'}}]}));});});
+ let calls=0,finishReason='stop',nullPayload=false;const requestedLimits:(number|null)[]=[];const secret='only-test-secret-never-return';
+ const server=createServer((req,res)=>{let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{calls++;assert.equal(req.headers.authorization,`Bearer ${secret}`);assert.equal(req.url,'/v1/chat/completions');const payload=JSON.parse(body);assert.equal(payload.model,'test-model');requestedLimits.push(payload.max_tokens??null);res.setHeader('content-type','application/json');res.end(JSON.stringify(nullPayload?null:{choices:[{finish_reason:finishReason,message:{content:'OK'}}]}));});});
  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
  try{
   const baseUrl=`http://127.0.0.1:${(server.address() as any).port}/v1`;
@@ -46,12 +47,82 @@ test('模型配置按企业隔离、密钥加密与保留、真实传输适配�
   assert.equal((await request(root,'PUT',endpoint,{baseUrl,model:'test-model'})).statusCode,200);
   assert.equal((await request(root,'PUT',endpoint,{baseUrl:baseUrl+'/changed',model:'test-model'})).statusCode,400);
   const tested=await request(root,'POST',endpoint+'/test',{});assert.equal(tested.statusCode,200,tested.body);assert.equal(tested.json().connected,true);assert.equal(calls,1);
+  assert.equal(requestedLimits[0],null);assert.equal(await callModel(config,{baseUrl,model:'test-model',apiKey:secret},'test','test',{maxOutputTokens:8192}),'OK');assert.equal(requestedLimits.at(-1),8192);
+  const priorCalls=calls;await assert.rejects(()=>callModel(config,{baseUrl,model:'test-model',apiKey:secret},'test','test',{maxOutputTokens:100000}),(e:any)=>e.status===400);assert.equal(calls,priorCalls);
+  finishReason='length';const truncated=await request(root,'POST',endpoint+'/test',{});assert.equal(truncated.statusCode,502);assert.equal(truncated.json().error.code,'AI_OUTPUT_TRUNCATED');assert(!truncated.body.includes(secret));
+  finishReason='content_filter';await assert.rejects(()=>callModel(config,{baseUrl,model:'test-model',apiKey:secret},'test','test'),(e:any)=>e.code==='AI_OUTPUT_FILTERED');
+  finishReason='stop';nullPayload=true;await assert.rejects(()=>callModel(config,{baseUrl,model:'test-model',apiKey:secret},'test','test'),(e:any)=>e.code==='AI_INVALID_RESPONSE');nullPayload=false;
   assert.equal((await request(adminB,'GET','/api/tenants/haichuan/ai/provider')).json().configured,false);
   await db.query('INSERT INTO ai_provider_settings(tenant_id,base_url,model,encrypted_key) VALUES($1,$2,$3,$4)',['haichuan',baseUrl,'test-model',row.encrypted_key]);
   await assert.rejects(()=>loadProvider(db,config,'haichuan'),(e:any)=>e.code==='AI_KEY_UNAVAILABLE');
   await db.query('UPDATE ai_provider_settings SET encrypted_key=$1 WHERE tenant_id=$2',[row.encrypted_key.slice(0,-3)+'zzz','fujian']);
   const broken=await request(root,'POST',endpoint+'/test',{});assert.equal(broken.statusCode,503);assert.equal(broken.json().error.code,'AI_KEY_UNAVAILABLE');assert(!broken.body.includes(secret));
  }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
+
+test('Widget诊断仅保留输出结构，识别HTML、代码块和JSON封装而不泄露正文或任意字段',()=>{
+ const html='<!DOCTYPE html><HTML lang="zh"><body>private-fixture</body></HTML>';
+ assert.deepEqual(inspectWidgetOutput(html),{format:'html',characters:html.length,htmlOpen:true,htmlClose:true,codeFence:false,jsonHtml:false});
+ assert.equal(inspectWidgetOutput('```html\n'+html+'\n```').format,'markdown');
+ const result=inspectWidgetOutput(JSON.stringify({html,secret:'not-for-diagnostics',privateName:'example'}));
+ assert.equal(result.format,'json');assert.equal(result.jsonHtml,true);assert(!JSON.stringify(result).includes('private-fixture'));assert(!JSON.stringify(result).includes('not-for-diagnostics'));assert(!JSON.stringify(result).includes('privateName'));
+ assert.equal(inspectWidgetOutput('{"content":{"html":"<html></html>"}}').jsonHtml,true);
+ assert.equal(inspectWidgetOutput('null').format,'json');assert.equal(inspectWidgetOutput('普通说明文字').htmlOpen,false);
+ assert.equal(inspectWidgetOutput('<html><body>incomplete').htmlClose,false);
+});
+
+test('制课资料10万字符边界、重复/归档/跨企业/未解析资料在模型调用前拒绝',async()=>{
+ await request(root,'POST','/api/auth/switch-tenant',{tenantId:'fujian'});root.tenant='fujian';
+ let calls=0;const server=createServer((req,res)=>{calls++;req.resume();req.on('end',()=>{res.writeHead(503);res.end('{}');});});
+ await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const upload=async(client:Client,tenant:string,text:string)=>{const boundary='length-'+randomUUID();const response=await request(client,'POST',`/api/tenants/${tenant}/knowledge`,Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="fictional-length.md"\r\nContent-Type: text/markdown\r\n\r\n${text}\r\n--${boundary}--\r\n`),{'content-type':`multipart/form-data; boundary=${boundary}`});assert.equal(response.statusCode,200,response.body);return response.json();};
+ try{
+  await request(root,'PUT','/api/tenants/fujian/ai/provider',{baseUrl:`http://127.0.0.1:${(server.address() as any).port}/v1`,model:'boundary-fixture',apiKey:'fixture-only-key'});
+  const long=await upload(root,'fujian','甲'.repeat(100000)),extra=await upload(root,'fujian','乙'),foreign=await upload(adminB,'haichuan','另一隔离企业的虚构文本');
+  const seed=(await request(root,'GET','/api/tenants/fujian/courses/fujian-c0')).json();
+  const course=await request(root,'POST','/api/tenants/fujian/courses',{...seed,id:randomUUID(),title:'长资料边界草稿',publish:false,knowledgeIds:[]});assert.equal(course.statusCode,200,course.body);
+  const path='/api/tenants/fujian/authoring/jobs',body={courseId:course.json().id,requirement:'虚构边界测试',knowledgeIds:[long.id]};
+  const accepted=await request(root,'POST',path,body,{'idempotency-key':randomUUID()});assert.equal(accepted.statusCode,200,accepted.body);
+  let detail:any;for(let i=0;i<100;i++){detail=(await request(root,'GET',`${path}/${accepted.json().id}`)).json();if(detail.state==='paused')break;await new Promise(resolve=>setTimeout(resolve,50));}
+  assert.equal(detail.state,'paused');assert.equal(calls,1);
+  const stored=(await db.query('SELECT input FROM authoring_jobs WHERE id=$1',[detail.id])).rows[0].input;assert.equal(stored.materials[0].text.length,100000);
+  await request(root,'POST',`${path}/${detail.id}/commands`,{commandId:randomUUID(),revision:detail.revision,action:'cancel'});
+  const before=(await request(root,'GET',path)).json().items.length;
+  for(const [ids,message] of [[[long.id,extra.id],/10万/],[[long.id,long.id],/重复/],[[foreign.id],/不存在/],[[randomUUID()],/不存在/]] as const){const rejected=await request(root,'POST',path,{...body,knowledgeIds:ids},{'idempotency-key':randomUUID()});assert.equal(rejected.statusCode,400,rejected.body);assert.match(rejected.body,message);}
+  assert.equal((await request(root,'POST',`/api/tenants/fujian/knowledge/${long.id}/archive`,{})).statusCode,200);
+  const archived=await request(root,'POST',path,body,{'idempotency-key':randomUUID()});assert.equal(archived.statusCode,400);assert.match(archived.body,/归档/);
+  await db.query("UPDATE knowledge SET status='pending',text_content=NULL WHERE tenant_id='fujian' AND id=$1",[extra.id]);
+  const pending=await request(root,'POST',path,{...body,knowledgeIds:[extra.id]},{'idempotency-key':randomUUID()});assert.equal(pending.statusCode,400);assert.match(pending.body,/未解析/);
+  assert.equal((await request(learner,'POST',path,body,{'idempotency-key':randomUUID()})).statusCode,403);
+  assert.equal((await request(root,'GET',path)).json().items.length,before);assert.equal(calls,1);
+ }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
+
+test('制课保留模型认证、限流、超时与无效响应原因，暂停不自动重试，人工重试可恢复',async()=>{
+ await request(root,'POST','/api/auth/switch-tenant',{tenantId:'fujian'});root.tenant='fujian';
+ let mode='401',calls=0;
+ const server=createServer((req,res)=>{req.resume();req.on('end',()=>{calls++;if(mode==='timeout')return;if(mode==='invalid'){res.end('{bad');return;}if(mode!=='ok'){res.writeHead(Number(mode));res.end('{"private":"fixture-not-for-users"}');return;}res.setHeader('content-type','application/json');res.end(JSON.stringify({choices:[{message:{content:JSON.stringify({courseTitle:'故障恢复验收',outlines:[{id:'fault-scene',type:'slide',title:'虚构文字课件',description:'虚构测试',keyPoints:['先核对需求'],order:1}]})}}]}));});});
+ await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const previousTimeout=config.aiRequestTimeoutMs;config.aiRequestTimeoutMs=1000;
+ try{
+  const saved=await request(root,'PUT','/api/tenants/fujian/ai/provider',{baseUrl:`http://127.0.0.1:${(server.address() as any).port}/v1`,model:'fault-fixture',apiKey:'fixture-only-key'});assert.equal(saved.statusCode,200,saved.body);
+  const seed=(await request(root,'GET','/api/tenants/fujian/courses/fujian-c0')).json();
+  const created=await request(root,'POST','/api/tenants/fujian/courses',{...seed,id:randomUUID(),title:'故障恢复隔离草稿',publish:false,knowledgeIds:[]});assert.equal(created.statusCode,200,created.body);
+  const path='/api/tenants/fujian/authoring/jobs';
+  const wait=async(id:string,state:string)=>{for(let i=0;i<200;i++){const job=(await request(root,'GET',`${path}/${id}`)).json();if(job.state===state)return job;await new Promise(resolve=>setTimeout(resolve,50));}throw new Error(`Expected authoring state ${state}`);};
+  for(const [failure,message] of [['401',/认证失败/],['429',/额度不足/],['503',/暂时不可用/],['timeout',/响应超时/],['invalid',/有效文本内容/]] as const){
+   mode=failure;const prior=calls;
+   const started=await request(root,'POST',path,{courseId:created.json().id,requirement:'仅作虚构故障验收',knowledgeIds:[]},{'idempotency-key':randomUUID()});assert.equal(started.statusCode,200,started.body);
+   let job=await wait(started.json().id,'paused');assert.match(job.error,message);assert(!job.error.includes('fixture-not-for-users'));assert.equal(job.completedScenes,0);
+   await new Promise(resolve=>setTimeout(resolve,550));assert.equal(calls,prior+1,'Paused job must not automatically call the model again');
+   const retained=(await db.query('SELECT input,checkpoint FROM authoring_jobs WHERE id=$1',[job.id])).rows[0];assert.equal(retained.input.requirement,'仅作虚构故障验收');assert.deepEqual(retained.checkpoint.scenes||[],[]);
+   mode='ok';const retried=await request(root,'POST',`${path}/${job.id}/commands`,{commandId:randomUUID(),revision:job.revision,action:'retry'});assert.equal(retried.statusCode,200,retried.body);
+   job=await wait(job.id,'awaiting_outline');assert.equal(job.error,null);assert.equal(job.outline[0].id,'fault-scene');assert.equal(calls,prior+2);
+   const occupied=await request(root,'POST',path,{courseId:created.json().id,requirement:'同课程的新任务',knowledgeIds:[]},{'idempotency-key':randomUUID()});
+   assert.equal(occupied.statusCode,409);assert.match(occupied.body,/已有其他未完成的制课任务/);assert.equal(calls,prior+2);
+   assert.equal((await request(root,'POST',`${path}/${job.id}/commands`,{commandId:randomUUID(),revision:job.revision,action:'cancel'})).statusCode,200);
+  }
+ }finally{config.aiRequestTimeoutMs=previousTimeout;server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 test('会话认证、CSRF和来源校验在服务端生效',async()=>{
  assert.equal((await app.inject({url:'/api/bootstrap'})).statusCode,401);
@@ -211,7 +282,9 @@ test('DOCX/PPTX正文解析保留页序，拒绝空内容、实体和损坏文�
  const docx=new JSZip();docx.file('word/document.xml','<w:document xmlns:w="urn:word"><w:body><w:p><w:r><w:t>服务标准</w:t></w:r></w:p></w:body></w:document>');
  assert.deepEqual(await extractMaterial('test.docx',await docx.generateAsync({type:'nodebuffer'})),[{page:1,text:'服务标准'}]);
  const pptx=new JSZip();for(const page of [10,2,1])pptx.file(`ppt/slides/slide${page}.xml`,`<p:sld xmlns:p="urn:p" xmlns:a="urn:a"><a:p><a:r><a:t>第${page}张</a:t></a:r></a:p></p:sld>`);
- assert.deepEqual((await extractMaterial('test.pptx',await pptx.generateAsync({type:'nodebuffer'}))).map(u=>u.text),['第1张','第2张','第10张']);
+ pptx.file('ppt/presentation.xml','<p:presentation xmlns:p="urn:p" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="r10"/><p:sldId id="257" r:id="r1"/><p:sldId id="258" r:id="r2"/></p:sldIdLst></p:presentation>');
+ pptx.file('ppt/_rels/presentation.xml.rels','<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+[1,2,10].map(page=>`<Relationship Id="r${page}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${page}.xml"/>`).join('')+'</Relationships>');
+ assert.deepEqual((await extractMaterial('test.pptx',await pptx.generateAsync({type:'nodebuffer'}))).map(u=>u.text),['第10张','第1张','第2张']);
  await assert.rejects(()=>extractMaterial('empty.txt',Buffer.from('   ')),/未提取/);
  const entity=new JSZip();entity.file('word/document.xml','<!DOCTYPE foo [<!ENTITY x SYSTEM "file:///secret">]><p>&x;</p>');const entityBuffer=await entity.generateAsync({type:'nodebuffer'});await assert.rejects(()=>extractMaterial('bad.docx',entityBuffer),/外部实体/);
  await assert.rejects(()=>extractMaterial('broken.docx',Buffer.from('PKbroken')));
@@ -264,6 +337,8 @@ test('本地OpenMAIC制课：资料快照、大纲编辑、暂停重试、场景
   const command={commandId:randomUUID(),revision:job.revision,action:'confirm'};
   assert.equal((await request(root,'POST',`${path}/${jid}/commands`,command)).statusCode,200);assert.equal((await request(root,'POST',`${path}/${jid}/commands`,command)).statusCode,200);
   job=await waitState('paused');assert.equal(calls,2);failContent=false;
+  const revisedPaused=await request(root,'PUT',`${path}/${jid}/outline`,{revision:job.revision,outlines:job.outline.map((o:any)=>({...o,description:'失败后修订的讲授说明'}))});assert.equal(revisedPaused.statusCode,200,revisedPaused.body);job=revisedPaused.json();
+  assert.equal(job.outline[0].description,'失败后修订的讲授说明');
   assert.equal((await request(root,'POST',`${path}/${jid}/commands`,{commandId:randomUUID(),revision:job.revision,action:'retry'})).statusCode,200);
   job=await waitState('paused');assert.equal(calls,4);assert.equal(job.completedScenes,0);assert.match(job.error,/未返回有效讲解动作/);
   const retained=(await db.query('SELECT checkpoint FROM authoring_jobs WHERE id=$1',[jid])).rows[0].checkpoint;
@@ -292,6 +367,24 @@ test('本地OpenMAIC制课：资料快照、大纲编辑、暂停重试、场景
   const task=await request(root,'POST','/api/tenants/fujian/tasks',{title:'已完成课程再分配验收',description:'',start:new Date().toISOString().slice(0,10),due:new Date(Date.now()+86400000).toISOString().slice(0,10),sequential:true,courseIds:[cid],memberIds:[maicProvision.id],publish:true});assert.equal(task.statusCode,200,task.body);assert.deepEqual(task.json().completedMemberIds,[maicProvision.id]);
   const report=await request(root,'GET',`/api/tenants/fujian/reports/tasks/${task.json().id}`);assert.equal(report.statusCode,200,report.body);assert.equal(report.json().completed,1);assert.equal(report.json().items[0].stages[0].completedLessons,1);assert(report.json().items[0].lastActivity);
  }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
+
+test('暂停的制课任务允许修改未生成场景，并保护已生成内容',async()=>{
+ const source=(await db.query("SELECT * FROM authoring_jobs WHERE state='applied' ORDER BY created_at DESC LIMIT 1")).rows[0];assert.ok(source);
+ const second={id:'next-scene',type:'interactive',title:'待修订互动',description:'初始说明',keyPoints:['澄清需求'],order:2};
+ const checkpoint={outlines:[source.checkpoint.outlines[0],second],scenes:[source.checkpoint.scenes[0]],pendingContent:{outlineId:second.id,content:{html:'<div>待替换</div>',widgetType:'simulation'}}};
+ const jid=randomUUID(),path=`/api/tenants/fujian/authoring/jobs/${jid}`;
+ await db.query("INSERT INTO authoring_jobs(id,tenant_id,course_id,actor_id,request_key,input_hash,input,state,revision,checkpoint) VALUES($1,$2,$3,$4,$5,$6,$7,'paused',1,$8)",[jid,source.tenant_id,source.course_id,source.actor_id,randomUUID(),source.input_hash,JSON.stringify(source.input),JSON.stringify(checkpoint)]);
+ const detail=(await request(root,'GET',path)).json();assert.equal(detail.completedScenes,1);
+ const changed=detail.outline.map((outline:any,index:number)=>index===1?{...outline,type:'slide',title:'文字练习'}:outline);
+ const saved=await request(root,'PUT',path+'/outline',{revision:detail.revision,outlines:changed});assert.equal(saved.statusCode,200,saved.body);
+ const retained=(await db.query('SELECT checkpoint FROM authoring_jobs WHERE id=$1',[jid])).rows[0].checkpoint;
+ assert.equal(retained.outlines[1].type,'slide');assert.equal(retained.pendingContent,undefined);assert.equal(retained.scenes.length,1);
+ const blocked=await request(root,'PUT',path+'/outline',{revision:saved.json().revision,outlines:changed.map((outline:any,index:number)=>index===0?{...outline,title:'不得修改已完成场景'}:outline)});assert.equal(blocked.statusCode,409);
+ const gated=await request(root,'PUT',path+'/outline',{revision:saved.json().revision,outlines:changed.map((outline:any,index:number)=>index===1?{...outline,type:'interactive',widgetType:'procedural-skill',widgetOutline:{concept:'流程'}}:outline)});assert.equal(gated.statusCode,200,gated.body);
+ const retry=await request(root,'POST',path+'/commands',{commandId:randomUUID(),revision:gated.json().revision,action:'retry'});assert.equal(retry.statusCode,400);assert.match(retry.body,/尚未开放/);assert.equal((await request(root,'GET',path)).json().state,'paused');
+ const incomplete=await request(root,'PUT',path+'/outline',{revision:gated.json().revision,outlines:changed.map((outline:any,index:number)=>index===1?{...outline,type:'interactive',widgetType:'simulation'}:outline)});assert.equal(incomplete.statusCode,200,incomplete.body);
+ const missingConfig=await request(root,'POST',path+'/commands',{commandId:randomUUID(),revision:incomplete.json().revision,action:'retry'});assert.equal(missingConfig.statusCode,400);assert.match(missingConfig.body,/互动配置缺失/);
 });
 
 test('制课步骤重启后过期租约转暂停，保留内容检查点并允许取消',async()=>{
@@ -493,4 +586,24 @@ test('Tailscale 三端来源允许登录请求，其他来源仍拒绝且 CSRF �
   assert.equal(denied.statusCode,403);
   assert.equal(denied.json().error.code,'ORIGIN_REFUSED');
  }
+});
+
+test('课内测验与项目任务完成前不能计入课程进度',async()=>{
+ const actor=(await provision('completion@test.local','学员')).client;
+ const cid=randomUUID(),quizId=randomUUID(),pblId=randomUUID(),questionId=randomUUID(),milestoneId=randomUUID();
+ const scenes=[{id:quizId,type:'quiz',content:{questions:[{id:questionId,type:'single',question:'先做什么？',options:[{value:'A',label:'澄清需求'}],answer:['A']}]},actions:[]},{id:pblId,type:'pbl',content:{projectV2:{milestones:[{id:milestoneId,title:'写出问题'}]}},actions:[]}];
+ const content={id:cid,kind:'learn',lessons:[{id:quizId,format:'AI课堂',content:quizId},{id:pblId,format:'AI课堂',content:pblId}],classroom:{scenes}};
+ await db.query("INSERT INTO courses(id,tenant_id,title,kind,category,status,version,data) VALUES($1,'fujian','课内完成校验','learn','客户服务','published',1,$2)",[cid,JSON.stringify({tenantId:'fujian',audience:{mode:'enterprise',departments:[],memberIds:[]}})]);
+ await db.query("INSERT INTO course_versions(tenant_id,course_id,version,content) VALUES('fujian',$1,1,$2)",[cid,JSON.stringify(content)]);
+ const progress=(lessonId:string)=>request(actor,'POST','/api/learn/progress',{courseId:cid,version:1,lessonId,eventId:randomUUID()});
+ assert.equal((await progress(quizId)).statusCode,400);
+ const runtime=(sceneId:string)=>`/api/learn/courses/${cid}/versions/1/classroom/scenes/${sceneId}/runtime`;
+ const answered={actionIndex:0,answers:{[questionId]:['A']},submitted:false,notes:{}};
+ assert.equal((await request(actor,'PUT',runtime(quizId),{eventId:randomUUID(),revision:0,state:answered})).statusCode,200);
+ assert.equal((await progress(quizId)).statusCode,400);
+ assert.equal((await request(actor,'PUT',runtime(quizId),{eventId:randomUUID(),revision:1,state:{...answered,submitted:true}})).statusCode,200);
+ assert.equal((await progress(quizId)).statusCode,200);
+ assert.equal((await progress(pblId)).statusCode,400);
+ assert.equal((await request(actor,'PUT',runtime(pblId),{eventId:randomUUID(),revision:0,state:{actionIndex:0,answers:{},submitted:false,notes:{[milestoneId]:'三个开放式问题'}}})).statusCode,200);
+ assert.equal((await progress(pblId)).statusCode,200);
 });

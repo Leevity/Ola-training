@@ -13,6 +13,8 @@
   "scripts": {
     "build:maic": "pnpm --filter @openmaic/dsl build && pnpm --filter @openmaic/generation build && pnpm --filter @openmaic/renderer build && pnpm --filter @openmaic/editor build",
     "build": "pnpm run build:maic && pnpm --filter ola-training-backend build && pnpm --filter ola-training-admin build && pnpm --filter ola-training-learner build && pnpm --filter ola-training build",
-    "test": "pnpm --filter ola-training-backend test && pnpm --filter ola-training-admin test && pnpm --filter ola-training-learner test && pnpm --filter @ola/classroom-ui test && pnpm --filter ola-training test"
+    "test": "pnpm --filter ola-training-backend test && pnpm --filter ola-training-admin test && pnpm --filter ola-training-learner test && pnpm --filter @ola/classroom-ui test && pnpm --filter ola-training test && pnpm run test:admin-ui && pnpm run test:learner-ui",
+    "test:admin-ui": "pnpm --dir packages/classroom-ui exec tsx --tsconfig ../../admin/tsconfig.json --test ../../admin/ui-tests/*.test.mjs",
+    "test:learner-ui": "pnpm --dir packages/classroom-ui exec tsx --tsconfig ../../learner/tsconfig.json --test ../../learner/ui-tests/*.test.mjs"
   }
 }

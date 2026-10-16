@@ -25,7 +25,7 @@ export async function buildApp(db:Database,config:Config,logger=false){
   if(error instanceof HttpError)return reply.code(error.status).send({error:{code:error.code,message:error.message},requestId:req.id});
   if(error instanceof ZodError)return reply.code(400).send({error:{code:'INVALID_REQUEST',message:error.issues.map(i=>`${i.path.join('.')}: ${i.message}`).slice(0,5).join('；')},requestId:req.id});
   const e=error as any;
-  if(e.code==='23505')return reply.code(409).send({error:{code:'CONFLICT',message:'记录或编号已存在'},requestId:req.id});
+  if(e.code==='23505')return reply.code(409).send({error:{code:'CONFLICT',message:e.constraint==='authoring_active_course'?'该课程已有其他未完成的制课任务，请先完成或取消该任务，再重试。':'记录或编号已存在'},requestId:req.id});
   if(e.code==='23503')return reply.code(400).send({error:{code:'INVALID_REFERENCE',message:'关联记录不存在或不可访问'},requestId:req.id});
   if(e.statusCode&&e.statusCode<500)return reply.code(e.statusCode).send({error:{code:e.code||'INVALID_REQUEST',message:e.statusCode===413?'文件或请求过大':'请求格式不正确'},requestId:req.id});
   req.log.error(error,'Request failed');return reply.code(500).send({error:{code:'INTERNAL_ERROR',message:'服务处理失败，请稍后重试'},requestId:req.id});

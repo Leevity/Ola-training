@@ -220,6 +220,7 @@ function Workspace({
       setData(next);
       setError('');
     }
+    return next;
   };
   useEffect(()=>watchLearningRefresh(refresh,e=>setToast({message:'学习数据同步失败，请重试刷新',error:true})),[]);
   useEffect(() => {

@@ -12,6 +12,13 @@ const silentLogger: GenerationLogger = {
 };
 
 describe('scene content model-output failures', () => {
+  it('threads the isolated-host math option through scene and widget generation', async () => {
+    const html = '<!DOCTYPE html><html><head></head><body><button>Start</button><script>window.ready=true;</script></body></html>';
+    const content = await generateSceneContent(widgetOutline(), async () => html, { injectMathResources: false });
+    expect(content).toHaveProperty('html', html);
+    const direct = await generateWidgetContent(widgetOutline(), async () => html, undefined, { injectMathResources: false });
+    expect(direct).toHaveProperty('html', html);
+  });
   it.each([
     ['slide', slideOutline, JSON.stringify({ background: { type: 'solid', color: '#fff' } })],
     ['quiz', quizOutline, JSON.stringify({ question: 'not an array' })],

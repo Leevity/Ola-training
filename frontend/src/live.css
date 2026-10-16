@@ -280,7 +280,7 @@
   opacity: 0.5;
 }
 .task-course-row:disabled {
-  opacity: 0.65;
+  opacity: 1;
 }
 .my-overview strong {
   min-width: 0;
@@ -462,3 +462,5 @@
 }
 .brand-mark {font-size:12px;letter-spacing:-.5px;flex-shrink:0}.brand strong {font-size:20px;letter-spacing:-.4px;white-space:nowrap}
 .brand-mark:has(> img) {background:transparent;transform:none}.brand-mark > img {width:100%;height:100%;object-fit:contain}.ola-nav-icon {width:24px;height:24px;object-fit:contain}
+.course-page .course-search label,.course-page .course-search>button,.task-page .search-line,.task-page .plain-tabs button,.task-page .filter,.course-page .status-switch button,.course-page .category-scroll button,.course-page .training-mode button,.empty button{min-height:44px}
+.course-card-body strong {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;min-height:39px;line-height:1.4;overflow-wrap:anywhere}

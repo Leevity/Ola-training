@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect,useRef,useState } from "react";
+import {routeChoice,choiceRoute} from '../../shared/learner-navigation';
+import {keepListScroll} from '../../shared/learner-list-scroll';
 import { Bell, ChevronRight, Clock3, FileText, Trophy } from "lucide-react";
 import * as api from "@ola/learner-client";
 import { asset, CourseCard, displayCourse, Empty, Page, Topbar } from "./ui";
@@ -6,9 +8,10 @@ import { usePortal, useRemote, Loading, ErrorState } from "./portal";
 import { percent, dateTime, key } from "./domain";
 type Nav = { go: (path: string) => void; back: () => void };
 export function Records({ go, back, mode }: Nav & { mode: string }) {
-  const { data } = usePortal();
-  const [type, setType] = useState("training"),
-    [status, setStatus] = useState("all");
+  const { data,session } = usePortal();
+  useEffect(()=>keepListScroll(session.user.tenantId+':'+session.user.memberId),[]);
+  const [type, setType] = useState(()=>routeChoice(location.hash,'type',['training','exam'],'training')),
+    [status, setStatus] = useState(()=>routeChoice(location.hash,'status',['all','active','done'],'all'));
   const courses = data.courses.filter(
     (c) =>
       status === "all" ||
@@ -53,6 +56,7 @@ export function Records({ go, back, mode }: Nav & { mode: string }) {
               onClick={() => {
                 setType(id);
                 setStatus("all");
+                go(choiceRoute(location.hash,{type:id,status:'all'}));
               }}
             >
               {title}
@@ -81,7 +85,7 @@ export function Records({ go, back, mode }: Nav & { mode: string }) {
               <button
                 key={id}
                 className={status === id ? "selected" : ""}
-                onClick={() => setStatus(id)}
+                onClick={() => {setStatus(id);go(choiceRoute(location.hash,{status:id}));}}
               >
                 {title}
               </button>
@@ -172,19 +176,27 @@ export function Records({ go, back, mode }: Nav & { mode: string }) {
   );
 }
 export function Messages({ go, back }: Nav) {
-  const { data, refresh, notify } = usePortal();
-  const [busy, setBusy] = useState(false);
+  const { data, refresh,session } = usePortal();
+  const [busy, setBusy] = useState(false),[error,setError]=useState(''),
+    [tab,setTab]=useState(()=>routeChoice(location.hash,'tab',['all','unread'],'all'));
+  const mounted=useRef(true),pending=useRef(false),retry=useRef<{ids:string[];href?:string}>({ids:[]});
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+  useEffect(()=>keepListScroll(session.user.tenantId+':'+session.user.memberId),[]);
+  const list=data.notifications.filter(n=>tab==='all'||!n.read);
   const read = async (ids: string[], href?: string) => {
-    if (busy) return;
-    setBusy(true);
+    if (pending.current) return;
+    pending.current=true;
+    setBusy(true);setError('');retry.current={ids:[...ids],href};
     try {
       await api.readNotices(ids);
+      if(!mounted.current)return;
       await refresh();
-      if (href) go(href);
+      if (href&&mounted.current) go(href);
     } catch (e) {
-      notify((e as Error).message);
+      if(mounted.current)setError((e as Error).message);
     } finally {
-      setBusy(false);
+      pending.current=false;
+      if(mounted.current)setBusy(false);
     }
   };
   return (
@@ -206,9 +218,14 @@ export function Messages({ go, back }: Nav) {
           </button>
         }
       />
+      <div className="detail-tabs">
+        <button disabled={busy} className={tab==='all'?'selected':''} onClick={()=>{setTab('all');go(choiceRoute(location.hash,{tab:'all'}));}}>全部消息</button>
+        <button disabled={busy} className={tab==='unread'?'selected':''} onClick={()=>{setTab('unread');go(choiceRoute(location.hash,{tab:'unread'}));}}>未读 {data.notifications.filter(n=>!n.read).length}</button>
+      </div>
+      {error&&<div className="page-gutter"><ErrorState message={error} retry={()=>void read(retry.current.ids,retry.current.href)}/></div>}
       <main className="page-gutter message-list">
-        {data.notifications.length ? (
-          data.notifications.map((n) => (
+        {list.length ? (
+          list.map((n) => (
             <button
               disabled={busy}
               key={n.id}
@@ -229,7 +246,7 @@ export function Messages({ go, back }: Nav) {
             </button>
           ))
         ) : (
-          <Empty title="暂无消息" hint="新的任务和成绩会在这里提示" />
+          <Empty title={tab==='unread'?'暂无未读消息':'暂无消息'} hint={tab==='unread'?'所有消息都已读完，可切换全部消息查看':'新的任务和成绩会在这里提示'} />
         )}
       </main>
     </Page>

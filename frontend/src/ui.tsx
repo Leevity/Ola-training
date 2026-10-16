@@ -266,19 +266,19 @@ export function Recommendation({
   return (
     <button
       className="recommendation"
-      onClick={() => go(`/course/${course.id}?v=${course.version}`)}
+        onClick={() => go(`/${course.kind==='learn'&&course.progress<100?'content':'course'}/${course.id}?v=${course.version}`)}
     >
       <div>
         <span className="eyebrow">为你推荐</span>
         <strong>{course.title}</strong>
-        <p>从这门课程开始，逐步提升岗位能力</p>
+        <p>{course.kind==='learn'&&course.progress?course.progress===100?'回顾课程要点，巩固学习成果':'接着上次的进度，继续学习':'从这门课程开始，逐步提升岗位能力'}</p>
         <small>
           <Clock3 size={15} />约 {course.kind === "exam" ? course.examMinutes : course.duration} 分钟 · {course.kind==='train'?course.trainingMode:`${course.count} ${course.kind==='exam'?'道试题':'个课时'}`}
         </small>
       </div>
       <img src={asset("home-resume-hero.webp")} alt="" />
       <span className="recommendation-cta">
-        {courseAction[course.kind]}
+        {course.kind==='learn'&&course.progress?course.progress===100?'复习课程':'继续学习':courseAction[course.kind]}
         <ChevronRight size={17} />
       </span>
     </button>

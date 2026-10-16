@@ -1,5 +1,6 @@
 import { KnowledgeDownload } from "./knowledge-download";
-import { useState } from "react";
+import {routeChoice,choiceRoute} from '../../shared/learner-navigation';
+import { useEffect,useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -27,7 +28,7 @@ import {
   type MainTab,
 } from "./ui";
 import { usePortal, useRemote, Loading, ErrorState } from "./portal";
-import { percent, taskPercent, taskStatus, labels, dateTime } from "./domain";
+import { percent, taskPercent, taskStatus, labels, dateTime, examEntry } from "./domain";
 type Nav = { go: (path: string) => void; back: () => void };
 export function CourseDetail({
   id,
@@ -37,8 +38,9 @@ export function CourseDetail({
 }: Nav & { id: string; version: number }) {
   const { data, refresh, notify } = usePortal(),
     remote = useRemote(() => api.course(id, version), [id, version]);
-  const [tab, setTab] = useState("目录"),
+  const [tab, setTab] = useState(()=>routeChoice(location.hash,'tab',['目录','简介','评价'],'目录')),
     [busy, setBusy] = useState(false);
+  useEffect(()=>setTab(routeChoice(location.hash,'tab',['目录','简介','评价'],'目录')),[location.hash]);
   if (remote.error)
     return (
       <Page go={go}>
@@ -155,7 +157,7 @@ export function CourseDetail({
               <button
                 key={t}
                 className={t === tab ? "selected" : ""}
-                onClick={() => setTab(t)}
+                onClick={() => {setTab(t);go(choiceRoute(location.hash,{tab:t}));}}
               >
                 {t}
               </button>
@@ -220,7 +222,7 @@ export function CourseDetail({
         {busy
           ? "正在处理…"
           : c.kind === "exam"
-            ? percent(c, data) === 100
+            ? examEntry(c,data).exhausted ? "查看考试规则与记录" : percent(c, data) === 100
               ? "查看规则并开始考试"
               : "开始考试"
             : percent(c, data) === 100

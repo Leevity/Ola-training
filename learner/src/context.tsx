@@ -4,7 +4,7 @@ export type Portal = {
   data: Overview;
   user: User;
   tenants: Tenant[];
-  refresh: () => Promise<void>;
+  refresh: () => Promise<Overview>;
   go: (path: string) => void;
   notify: (message: string, error?: boolean) => void;
   run: <T>(action: () => Promise<T>, success?: string) => Promise<T | undefined>;

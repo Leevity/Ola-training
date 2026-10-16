@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ScenePlayer, type SceneState } from "./player";
 import * as api from "@ola/learner-client";
 import { SceneWriter } from "./scene-writer";
+import { sceneCompletion } from '../../../shared/classroom.ts';
 function Loading() {
   return (
     <p role="status" className="maic-hint">
@@ -16,12 +17,14 @@ export function ClassroomSession({
   sceneId,
   scene,
   onReadyChange,
+  onCompletionChange,
 }: {
   courseId: string;
   version: number;
   sceneId: string;
   scene: unknown;
   onReadyChange?: (ready: boolean) => void;
+  onCompletionChange?: (complete:boolean,hint:string)=>void;
 }) {
   const [runtime, setRuntime] = useState<api.SceneRuntime | null>(null),
     [error, setError] = useState(""),
@@ -42,6 +45,7 @@ export function ClassroomSession({
     setError("");
     setBusy(true);
     onReadyChange?.(false);
+    onCompletionChange?.(false,'正在检查课堂练习…');
     try {
       const value = await api.sceneRuntime(courseId, version, sceneId);
       if (!active.current || sequence !== loadSequence.current) return;
@@ -76,6 +80,8 @@ export function ClassroomSession({
       setCanRetry(false);
       setStatus("课堂记录已同步");
       onReadyChange?.(true);
+      const completion=sceneCompletion(scene,value.state);
+      onCompletionChange?.(completion.complete,completion.hint);
     } catch (e) {
       if (active.current && sequence === loadSequence.current)
         setError((e as Error).message);
@@ -127,6 +133,8 @@ export function ClassroomSession({
   const save = (state: SceneState) => {
     latest.current = state;
     onReadyChange?.(false);
+    const completion=sceneCompletion(scene,state);
+    onCompletionChange?.(completion.complete,completion.hint);
     setRuntime((current) => (current ? { ...current, state } : current));
     setStatus("正在保存课堂记录…");
     clearTimeout(timer.current);

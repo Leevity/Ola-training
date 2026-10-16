@@ -6,7 +6,7 @@ import { Check, ChevronRight, FileText, Send } from "lucide-react";
 import * as api from "@ola/learner-client";
 import { Page, Topbar, FixedAction, Progress, Empty } from "./ui";
 import { usePortal, useRemote, Loading, ErrorState } from "./portal";
-import { percent, safeVideo } from "./domain";
+import { percent, safeVideo, firstIncompleteLesson, examEntry } from "./domain";
 const ClassroomSession = lazy(() =>
   import("@ola/classroom-ui/session").then((m) => ({
     default: m.ClassroomSession,
@@ -25,6 +25,8 @@ export function StudyPage({
   const [index, setIndex] = useState(0),
     [busy, setBusy] = useState(false),
     [ready, setReady] = useState(false),
+    [activityComplete,setActivityComplete]=useState(true),
+    [activityHint,setActivityHint]=useState(''),
     [finished, setFinished] = useState(false);
   const events = useRef(new Map<string, string>());
   useEffect(() => {
@@ -77,15 +79,7 @@ export function StudyPage({
       await api.complete(c, l.id, event);
       const saved = await refresh();
       notify("学习进度已保存");
-      const missing = c.lessons.findIndex(
-        (lesson) =>
-          !saved.progress.some(
-            (p) =>
-              p.courseId === c.id &&
-              p.version === c.version &&
-              p.lessonId === lesson.id,
-          ),
-      );
+      const missing = firstIncompleteLesson(c,saved);
       if (missing >= 0) {
         setReady(false);
         setIndex(missing);
@@ -119,7 +113,7 @@ export function StudyPage({
         {finished ? (
           <div className="info-card">
             <h2>课程学习完成</h2>
-            <p>所有课时的学习记录已保存，可以继续下一阶段。</p>
+            <p>所有课时的学习记录已保存，可查看任务或复习课程。</p>
             <button className="primary-button" onClick={() => go("/tasks")}>
               查看我的任务
             </button>
@@ -137,6 +131,7 @@ export function StudyPage({
                     (s: any) => s.id === l.content,
                   )}
                   onReadyChange={setReady}
+                  onCompletionChange={(complete,hint)=>{setActivityComplete(complete);setActivityHint(hint);}}
                 />
               </Suspense>
             ) : l.format === "视频链接" ? (
@@ -152,7 +147,7 @@ export function StudyPage({
               )
             ) : (
               <>
-                <div>
+                <div className="document-heading">
                   <FileText size={20} />
                   <strong>学习资料</strong>
                   <span>文档正文</span>
@@ -182,6 +177,7 @@ export function StudyPage({
               className={i === index ? "selected" : ""}
               disabled={busy || (l.format === "AI课堂" && !ready)}
               onClick={() => {
+                if(i===index&&!finished)return;
                 setReady(false);
                 setFinished(false);
                 setIndex(i);
@@ -208,12 +204,12 @@ export function StudyPage({
         disabled={
           busy ||
           finished ||
-          (l.format === "AI课堂" && !ready) ||
+          (l.format === "AI课堂" && (!ready||!activityComplete)) ||
           (l.format === "视频链接" && !safeVideo(l.content))
         }
         onClick={() => void complete()}
       >
-        {busy ? "正在保存…" : "完成本课时，继续"}
+        {busy ? "正在保存…" :l.format==='AI课堂'&&!activityComplete?activityHint||'请先完成课堂练习': "完成本课时，继续"}
         <Check size={18} />
       </FixedAction>
     </Page>
@@ -237,17 +233,14 @@ export function ExamRules({
       </Page>
     );
   if (!remote.value) return <Loading />;
-  const c = remote.value,
-    used = data.attempts.filter(
-      (a) => a.courseId === c.id && a.version === c.version,
-    ).length;
+  const c = remote.value, exam=examEntry(c,data), used=exam.used;
   return (
     <Page go={go} className="detail-page with-action">
       <Topbar title="考试规则" back={back} />
       <div className="light-hero">
-        <span className="eyebrow">考试课程 · 开始前请阅读</span>
+        <span className="eyebrow">{exam.exhausted?'考试课程 · 规则与记录':'考试课程 · 开始前请阅读'}</span>
         <h1>{c.title}</h1>
-        <p>了解答题时间、题量与通过要求，准备好后即可开始。</p>
+        <p>{exam.exhausted?'考试次数已用完，可查看规则与最近答卷。':exam.active?'当前有尚未结束的答卷，可恢复继续作答。':'了解答题时间、题量与通过要求，准备好后即可开始。'}</p>
       </div>
       <main className="page-gutter rules-body">
         <div className="info-card">
@@ -270,6 +263,7 @@ export function ExamRules({
         </div>
         <div className="info-card">
           <h2>答题说明</h2>
+          {exam.exhausted&&<p role="status">本版本考试次数已用完，不能再开始新考试。可以查看最近答卷；已有合格记录继续有效。</p>}
           <p>
             答案自动保存，考试开始后持续计时，客观题由系统评分。离开不会暂停计时，再次进入可恢复未结束的答卷；主观题由管理员确认分数。
           </p>
@@ -279,6 +273,7 @@ export function ExamRules({
         disabled={busy}
         onClick={async () => {
           if (busy) return;
+          if(exam.exhausted&&exam.latest){go(`/exam/${exam.latest.id}`);return;}
           setBusy(true);
           try {
             const a = await api.startExam(c);
@@ -290,7 +285,7 @@ export function ExamRules({
           }
         }}
       >
-        {busy ? "正在准备试卷…" : "开始考试"}
+        {busy ? "正在准备试卷…" : exam.action}
         <ChevronRight size={18} />
       </FixedAction>
     </Page>

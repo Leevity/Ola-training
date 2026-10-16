@@ -18,7 +18,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.mjs",
     "build": "tsc --noEmit && node build.mjs",
-    "test": "tsx --test tests/backend.test.ts tests/local-backup.test.ts",
+    "test": "tsx --test tests/backend.test.ts tests/local-backup.test.ts tests/material-parser.test.ts tests/ai-provider.test.ts",
     "data:local": "tsx scripts/local-backup.ts"
   },
   "dependencies": {

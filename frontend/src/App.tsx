@@ -30,14 +30,14 @@ function Routes() {
   if (path === "/my/settings") return <AccountPage {...nav} />;
   if (path === "/my/tasks") return <TaskCenter {...nav} />;
   if (path === "/growth" || path === "/my/growth")
-    return <GrowthPage {...nav} />;
+    return <GrowthPage key={location.hash} {...nav} />;
   if (path === "/search") return <CourseCenter key={path} {...nav} searchOnly />;
-  if (path === "/messages") return <Messages {...nav} />;
+  if (path === "/messages") return <Messages key={location.hash} {...nav} />;
   if (path === "/my/favorites") return <CourseCenter key={path} {...nav} favoritesOnly />;
   if (path === "/my/rank") return <RankPage {...nav} />;
   if (path === "/my/history" || path === "/history")
-    return <Records {...nav} mode="history" />;
-  if (path === "/my/courses") return <Records {...nav} mode="courses" />;
+    return <Records key={location.hash} {...nav} mode="history" />;
+  if (path === "/my/courses") return <Records key={location.hash} {...nav} mode="courses" />;
   if (seg[0] === "task") return <TaskDetail key={id} id={id} {...nav} />;
   if (seg[0] === "course")
     return (

@@ -77,8 +77,8 @@
   font-weight: 800;
 }
 .assistant-header p {
-  color: #7d97bd;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 12px;
   line-height: 1.4;
   margin: 0;
 }
@@ -90,7 +90,7 @@
   border: 0;
   background: transparent;
   font-weight: 650;
-  min-height: 36px;
+  min-height: 44px;
   padding: 0 4px;
   font-size: 13px;
 }
@@ -112,7 +112,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  min-height: 31px;
+  min-height: 44px;
   padding: 0 8px;
   white-space: nowrap;
   border: 0;
@@ -334,7 +334,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
+  min-height: 48px;
   padding: 2px 4px 2px 10px;
   background: white;
   border: 1px solid #d7e6ff;
@@ -345,8 +345,8 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -368,7 +368,7 @@
   color: #283d5b;
 }
 .assistant-composer input::placeholder {
-  color: #9bacc5;
+  color: var(--muted);
 }
 .assistant-composer .assistant-mic {
   background: #f4f9ff;
@@ -381,6 +381,7 @@
   border-radius: 50%;
   color: white;
 }
+.assistant-composer button:disabled:not(.assistant-send) {color:#8999af;background:#f2f5f9;border-radius:50%;cursor:not-allowed;opacity:.75}
 .assistant-welcome {
   text-align: center;
   padding: 60px 10px 20px;
@@ -597,8 +598,8 @@
   font-size: 15px;
 }
 .assistant-desktop .assistant-composer button {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
 }
 .assistant-desktop .assistant-course {
   gap: 14px;

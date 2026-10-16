@@ -1,0 +1,28 @@
+import React,{act} from 'react';
+import {createRoot} from 'react-dom/client';
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {JSDOM} from 'jsdom';
+const dom=new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>',{url:'http://localhost'});
+Object.assign(globalThis,{React,window:dom.window,document:dom.window.document,IS_REACT_ACT_ENVIRONMENT:true});
+const {Widget}=await import('../src/widget.tsx');
+test('互动布局消息校验发送窗口，忽略评分和未知来源，卸载清理',async()=>{
+ const root=createRoot(document.getElementById('root'));
+ await act(async()=>root.render(React.createElement(Widget,{html:'<button>示范</button>',title:'示范互动'})));
+ const frame=document.querySelector('iframe');
+ assert.equal(frame.getAttribute('sandbox'),'allow-scripts');
+ assert.equal(frame.getAttribute('referrerpolicy'),'no-referrer');
+ const dispatch=async(data,source)=>act(async()=>window.dispatchEvent(new dom.window.MessageEvent('message',{data,source})));
+ await dispatch({type:'ola-widget-height',height:750},window);
+ assert.equal(frame.style.height,'460px');
+ await dispatch({type:'score',height:750,passed:true},frame.contentWindow);
+ assert.equal(frame.style.height,'460px');
+ await dispatch({type:'ola-widget-height',height:750},frame.contentWindow);
+ assert.equal(frame.style.height,'752px');
+ await dispatch({type:'ola-widget-height',height:999999},frame.contentWindow);
+ assert.equal(frame.style.height,'2000px');
+ await act(async()=>root.unmount());
+ await dispatch({type:'ola-widget-height',height:700},frame.contentWindow);
+ assert.equal(document.querySelector('iframe'),null);
+ dom.window.close();
+});

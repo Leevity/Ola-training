@@ -13,12 +13,12 @@
  * Main entry point: post-process generated interactive HTML
  * Converts LaTeX delimiters and injects KaTeX rendering resources.
  */
-export function postProcessInteractiveHtml(html: string): string {
+export function postProcessInteractiveHtml(html: string, options: { injectMathResources?: boolean } = {}): string {
   // Convert LaTeX delimiters while protecting script tags
   let processed = convertLatexDelimiters(html);
 
   // Inject KaTeX resources if not already present
-  if (!processed.toLowerCase().includes('katex')) {
+  if (options.injectMathResources !== false && !processed.toLowerCase().includes('katex')) {
     processed = injectKatex(processed);
   }
 

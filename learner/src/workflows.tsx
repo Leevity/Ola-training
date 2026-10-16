@@ -1,4 +1,5 @@
 import { randomId } from '../../shared/random-id.ts';
+import {returnDestination} from '../../shared/learner-navigation';
 import {registerLeaveGuard,protectUnsaved} from '../../shared/navigation-guard';
 import { lazy, Suspense } from 'react';
 const ClassroomLesson=lazy(()=>import('./classroom-lesson').then(module=>({default:module.ClassroomLesson})));
@@ -9,6 +10,7 @@ import {
   BookOpen,
   Check,
   CheckCircle2,
+  CircleAlert,
   ChevronRight,
   Clock3,
   FileText,
@@ -27,7 +29,7 @@ import {
 import * as api from './api';
 import { usePortal, useRemote } from './context';
 import type { Attempt, Course, Question, Training } from './types';
-import { dateTime, key, percent, safeVideo, secondsLeft } from './domain';
+import { dateTime, key, percent, safeVideo, secondsLeft, firstIncompleteLesson, examEntry } from './domain';
 import { Empty, ErrorState, Loading, Modal, PageTitle, ProgressBar } from './ui';
 
 function DocumentBody({ text }: { text: string }) {
@@ -59,6 +61,9 @@ export function StudyPage({ id, version }: { id: string; version: number }) {
     [busy, setBusy] = useState(false),
     [finished, setFinished] = useState(false);
   const [classroomReady,setClassroomReady]=useState(false);
+  const [activityComplete,setActivityComplete]=useState(true);
+  const [activityHint,setActivityHint]=useState('');
+  const [outlineExpanded,setOutlineExpanded]=useState(false);
   const events = useRef(new Map<string, string>());
   useEffect(() => {
     if (!remote.value) return;
@@ -97,11 +102,12 @@ export function StudyPage({ id, version }: { id: string; version: number }) {
         events.current.set(lesson.id, event);
       }
       await api.complete(c, lesson.id, event);
-      await refresh();
+      const saved=await refresh();
       notify('课时进度已保存');
-      if (index < c.lessons.length - 1) {
+      const missing=firstIncompleteLesson(c,saved);
+      if (missing>=0) {
         setClassroomReady(false);
-        setIndex((i) => i + 1);
+        setIndex(missing);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else setFinished(true);
     } catch (e) {
@@ -116,27 +122,29 @@ export function StudyPage({ id, version }: { id: string; version: number }) {
       <PageTitle
         title={c.title}
         description={`${c.category} · 第 ${index + 1} / ${c.lessons.length} 课时`}
-        back={() => go(`/course/${id}?v=${v}`)}
+        back={() => go(returnDestination(location.hash,`/course/${id}?v=${v}`))}
       >
         <span className="badge blue">课程学习</span>
       </PageTitle>
       <div className="study-layout">
-        <aside className="study-directory">
-          <h3>课程目录</h3>
+        <aside className={`study-directory ${outlineExpanded?'expanded':''}`}>
+          <div className="study-directory-heading"><h3>课程目录</h3><button className="btn study-directory-toggle" aria-expanded={outlineExpanded} aria-controls="course-lesson-navigation" onClick={()=>setOutlineExpanded(value=>!value)}>{outlineExpanded?'收起目录':'展开目录'}<ChevronRight size={16}/></button></div>
           <p>
             {c.lessons.filter((l) => done(l.id)).length}/{c.lessons.length} 课时已完成
           </p>
           <ProgressBar value={percent(c, data)} />
-          <nav aria-label="课时目录">
+          <nav id="course-lesson-navigation" aria-label="课时目录">
             {c.lessons.map((l, i) => (
               <button
                 key={l.id}
                 className={index === i ? 'selected' : ''}
                 disabled={busy||(lesson.format==='AI课堂'&&!classroomReady)}
                 onClick={() => {
+                  if(i===index&&!finished){setOutlineExpanded(false);return;}
                   setClassroomReady(false);
                   setIndex(i);
                   setFinished(false);
+                  setOutlineExpanded(false);
                 }}
               >
                 <span>{done(l.id) ? <CheckCircle2 size={17} /> : String(i + 1).padStart(2, '0')}</span>
@@ -172,7 +180,7 @@ export function StudyPage({ id, version }: { id: string; version: number }) {
             <div className="completion-panel">
               <CheckCircle2 size={58} />
               <h2>本门课程学习完成</h2>
-              <p>你的学习进度已保存，继续下一阶段吧。</p>
+              <p>所有课时的学习记录已保存，可查看任务或复习课程。</p>
               <div>
                 <button className="btn" onClick={() => go('/growth')}>
                   评价课程
@@ -181,13 +189,13 @@ export function StudyPage({ id, version }: { id: string; version: number }) {
                   className="btn primary"
                   onClick={() => go(nextTask ? '/task/' + nextTask.id : '/courses')}
                 >
-                  {nextTask ? '返回任务，继续下一阶段' : '继续浏览课程'}
+                  {nextTask ? '返回任务详情' : '继续浏览课程'}
                   <ArrowRight size={16} />
                 </button>
               </div>
             </div>
           ) : lesson.format === 'AI课堂' ? (
-            <Suspense fallback={<Loading/>}><ClassroomLesson key={lesson.id} courseId={c.id} version={v} sceneId={lesson.content} scene={c.classroom?.scenes.find((scene:any)=>scene.id===lesson.content)} onReadyChange={setClassroomReady}/></Suspense>
+            <Suspense fallback={<Loading/>}><ClassroomLesson key={lesson.id} courseId={c.id} version={v} sceneId={lesson.content} scene={c.classroom?.scenes.find((scene:any)=>scene.id===lesson.content)} onReadyChange={setClassroomReady} onCompletionChange={(complete,hint)=>{setActivityComplete(complete);setActivityHint(hint);}}/></Suspense>
           ) : lesson.format === '视频链接' ? (
             <div className="video-content">
               {safeVideo(lesson.content) ? (
@@ -227,10 +235,10 @@ export function StudyPage({ id, version }: { id: string; version: number }) {
               <ArrowLeft size={16} />
               上一课时
             </button>
-            <span>{done(lesson.id) ? '本课时已完成' : '学习结束后，请确认完成本课时'}</span>
+            <span>{done(lesson.id) ? '本课时已完成' :lesson.format==='AI课堂'&&!activityComplete?activityHint:'学习结束后，请确认完成本课时'}</span>
             <button
               className="btn primary"
-              disabled={busy || finished || (lesson.format==='AI课堂'&&!classroomReady) || (lesson.format === '视频链接' && !safeVideo(lesson.content))}
+              disabled={busy || finished || (lesson.format==='AI课堂'&&(!classroomReady||!activityComplete)) || (lesson.format === '视频链接' && !safeVideo(lesson.content))}
               onClick={() => void complete()}
             >
               {busy ? <Loader2 className="spin" size={16} /> : <Check size={16} />}{' '}
@@ -257,6 +265,7 @@ export function ExamPage({ id }: { id: string }) {
     [answers, setAnswers] = useState<Attempt['answers']>({}),
     [saveStatus, setSaveStatus] = useState('答案已同步'),
     [saveError, setSaveError] = useState(''),
+    [submitError,setSubmitError]=useState(''),
     [confirm, setConfirm] = useState(false),
     [busy, setBusy] = useState(false),
     [now, setNow] = useState(Date.now());
@@ -277,7 +286,7 @@ export function ExamPage({ id }: { id: string }) {
       await queue.current.catch(()=>{});
       const a = await api.attempt(id);
       writer.current=new api.ExamAnswerWriter(a.answersRevision,(value,rev)=>api.saveAnswers(id,value,rev));
-      revision.current=0;savedRevision.current=0;setSaveError('');setSaveStatus('答案已同步');
+      revision.current=0;savedRevision.current=0;setSaveError('');setSubmitError('');setSaveStatus('答案已同步');
       setAttempt(a);
       answersRef.current = a.answers;
       setAnswers(a.answers);
@@ -343,6 +352,7 @@ export function ExamPage({ id }: { id: string }) {
     if (submitting.current) return;
     expired=expired||!!latestAttempt.current&&secondsLeft(latestAttempt.current.expiresAt,Date.now()+serverOffset.current)===0;
     submitting.current = true;
+    setSubmitError('');
     setBusy(true);
     setConfirm(false);
     try {
@@ -355,7 +365,19 @@ export function ExamPage({ id }: { id: string }) {
       await refresh();
       notify(expired ? '考试时间已结束，已提交保存的答案' : '答卷已提交');
     } catch (e) {
-      notify((e as Error).message, true);
+      // A lost HTTP response does not prove that the server rejected the submission.
+      if((e as {status?:number})?.status===0){
+        try{
+          const confirmed=await api.attempt(id);
+          if(confirmed.status!=='active'){
+            activeRef.current=false;setAttempt(confirmed);setAnswers(confirmed.answers);
+            await refresh().catch(()=>{});notify('已从服务端确认交卷结果');return;
+          }
+        }catch{/* Keep the original failure and explicit retry when confirmation is unavailable. */}
+      }
+      writer.current?.lockOnConflict(e);
+      if(writer.current?.locked)setSaveStatus('答卷有更新，请先加载服务端答卷');
+      setSubmitError((e as Error)?.message || '交卷未完成，请检查连接后重试。');
     } finally {
       setBusy(false);
       submitting.current = false;
@@ -370,6 +392,8 @@ export function ExamPage({ id }: { id: string }) {
   }, [remaining, attempt?.status]);
   if (error) return <ErrorState message={error} retry={() => void load()} />;
   if (!attempt) return <Loading text="正在恢复答卷" />;
+  const resultCourse=data.courses.find(c=>c.id===attempt.courseId&&c.version===attempt.version);
+  const quotaSpent=resultCourse?examEntry(resultCourse,data).exhausted:false;
   const courseTitle =
     data.attempts.find((a) => a.id === id)?.title ||
     data.courses.find((c) => c.id === attempt.courseId)?.title ||
@@ -379,7 +403,7 @@ export function ExamPage({ id }: { id: string }) {
   if (attempt.status !== 'active')
     return (
       <>
-        <PageTitle title={courseTitle} description="考试结果与作答回顾" back={() => go('/history')}>
+        <PageTitle title={courseTitle} description="考试结果与作答回顾" back={() => go(returnDestination(location.hash,'/history'))}>
           <button className="btn" onClick={() => window.print()}>
             <Printer size={16} />
             打印结果
@@ -392,22 +416,22 @@ export function ExamPage({ id }: { id: string }) {
           }
         >
           <span className="result-icon">
-            {attempt.status === 'pending_review' ? <Clock3 size={40} /> : <CheckCircle2 size={40} />}
+            {attempt.status === 'pending_review' ? <Clock3 size={40} /> : attempt.passed ? <CheckCircle2 size={40} /> : <CircleAlert size={40} />}
           </span>
           <div>
             <span className="eyebrow">
               {attempt.status === 'pending_review' ? '主观题待阅卷' : '本次考试成绩'}
             </span>
             <h1>
-              {attempt.score ?? '—'}
-              <small>/ 100 分</small>
+              {attempt.status === 'pending_review' ? '待定' : attempt.score ?? '—'}
+              <small>{attempt.status === 'pending_review' ? '最终成绩' : '/ 100 分'}</small>
             </h1>
             <p>
               {attempt.status === 'pending_review'
-                ? '当前显示客观题得分，最终成绩将在阅卷后更新。'
+                ? `客观题已得 ${attempt.score ?? '—'} 分，主观题阅卷后公布最终成绩。`
                 : attempt.passed
                   ? '恭喜你，通过本次考试'
-                  : '继续巩固知识，为下一次考试做好准备。'}
+                  : quotaSpent?'本版本考试次数已用完，可回顾答卷巩固知识。':'继续巩固知识，为下一次考试做好准备。'}
             </p>
           </div>
           <span className="result-status">
@@ -490,14 +514,15 @@ export function ExamPage({ id }: { id: string }) {
         </div>
         <span className={saveError ? 'danger-text' : 'save-state'}>{saveStatus}</span>
       </div>
-      {saveError && (
+      {(saveError||submitError) && (
         <div className="error-note" role="alert">
-          {saveError}
-          <button className="text-btn" onClick={() => writer.current?.locked?void load():void save().catch(() => {})}>
-            {writer.current?.locked?'放弃本地更改并加载服务端答卷':'重试保存'}
+          {submitError||saveError}
+          <button className="text-btn" disabled={busy} onClick={() => writer.current?.locked?void load():submitError?void submit(remaining===0):void save().catch(() => {})}>
+            {writer.current?.locked?'放弃本地更改并加载服务端答卷':submitError?remaining===0?'重新提交已保存的答案':'重试交卷':'重试保存'}
           </button>
         </div>
       )}
+      {remaining===0&&<p className="notice" role="status">{busy?'考试时间已结束，正在提交已保存的答案。':'考试时间已结束，不能继续修改。请确认已保存的答案提交成功。'}</p>}
       <div className="exam-layout">
         <section className="question-panel">
           <div className="question-meta">
@@ -716,7 +741,7 @@ export function TrainingPage({ id }: { id: string }) {
       <PageTitle
         title={title}
         description={`${course?.trainingMode || '场景练习'} · 本次已练习 ${elapsed} 分钟`}
-        back={() => go('/history')}
+        back={() => go(returnDestination(location.hash,'/history'))}
       >
         <button className="btn" disabled={busy} onClick={() => setConfirm(true)}>
           <Flag size={16} />
@@ -753,7 +778,7 @@ export function TrainingPage({ id }: { id: string }) {
             <span>点击保存表达 · 结束时一并保存当前输入</span>
           </header>
           <div className="training-scroll">
-            <div className="training-start">
+            {t.messages.length === 0 && <div className="training-start">
               <span>
                 <Headphones size={22} />
               </span>
@@ -763,7 +788,7 @@ export function TrainingPage({ id }: { id: string }) {
                 <br />
                 当前支持记录练习，自动客户对话和语音评分尚未开通。
               </p>
-            </div>
+            </div>}
             {t.messages.map((m) => (
               <div className="training-message" key={m.id}>
                 <span className="mini-avatar">我</span>
@@ -897,7 +922,7 @@ export function RecapPage({ id }: { id: string }) {
   const pending = s.status === 'pending_review' || s.status === 'active';
   return (
     <>
-      <PageTitle title="训练复盘" description={`${title} · v${s.course_version}`} back={() => go('/history')}>
+      <PageTitle title="训练复盘" description={`${title} · v${s.course_version}`} back={() => go(returnDestination(location.hash,'/history'))}>
         <button className="btn" onClick={remote.retry}>
           刷新评价
         </button>

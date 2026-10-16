@@ -1,12 +1,13 @@
 import { randomId } from '../../../shared/random-id.ts';
 import {AssetPicker,type AssetServices} from './asset-picker';
 import { useCallback, useRef, useState } from 'react';
-import { DSL_VERSION, normalizeElement, type Action, type SlideContent } from '@openmaic/dsl';
+import { DSL_VERSION, normalizeElement, type SlideContent } from '@openmaic/dsl';
 import { applyEditorTransaction, createEditorHistory, redoEditorTransaction, undoEditorTransaction, type EditorTransaction } from '@openmaic/editor/core';
 import { EMPTY_SELECTION, type Selection } from '@openmaic/editor/react';
 import { EditableSlideCanvasWithUI } from '@openmaic/editor/ui';
 import { ScenePlayer } from './player';
 import { cleanScene, type ClassroomScene } from './safety';
+import { replaceSpeechActions } from './teaching';
 
 type Document={dslVersion:string;stage:{id:string;name:string;createdAt:number;updatedAt:number};scenes:unknown[]};
 function newSlide(stageId:string,order:number):ClassroomScene{
@@ -37,7 +38,7 @@ export function ClassroomEditor({value,title,onChange,uploadAsset,listAssets,onB
     <label className="maic-field"><span>解析</span><textarea rows={2} value={q.analysis||''} onChange={e=>replace({...scene,content:{...scene.content,questions:scene.content.questions.map(item=>item.id===q.id?{...item,analysis:e.target.value}:item)}})}/></label>
    </div>)}</div>:scene.type==='interactive'?<><label className="maic-field"><span>互动内容 HTML</span><textarea rows={12} value={scene.content.html||''} onChange={e=>replace({...scene,content:{...scene.content,html:e.target.value}})}/></label><p className="maic-hint">预览在隔离区域运行，不允许访问账号、资料接口和外部网络。</p></>:<ProjectEditor scene={scene} onChange={replace}/>}
    <label className="maic-field"><span>讲解文字（每段空行分隔）</span><textarea rows={5} value={(scene.actions||[]).filter(a=>a.type==='speech').map(a=>a.text).join('\n\n')} onChange={e=>{
-    const speeches=e.target.value.split('\n\n');let cursor=0;const actions:Action[]=(scene.actions||[]).map(action=>action.type==='speech'?{...action,text:speeches[cursor++]||''}:action);while(cursor<speeches.length)actions.push({id:randomId(),type:'speech',text:speeches[cursor++]});replace({...scene,actions});
+    replace({...scene,actions:replaceSpeechActions(scene.actions||[],e.target.value,randomId)});
    }}/></label>
   </>}
  </fieldset></div>;

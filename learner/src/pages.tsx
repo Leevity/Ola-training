@@ -1,4 +1,7 @@
 import { KnowledgeDownload } from './knowledge-download';
+import {withReturnTo,returnDestination,routeChoice,choiceRoute} from '../../shared/learner-navigation';
+import {learningHistory} from '../../shared/learner-history';
+import {keepListScroll} from '../../shared/learner-list-scroll';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowRight,
@@ -44,6 +47,10 @@ import {
   taskStatus,
   nextLearningCourse,
   learningSummary,
+  phaseActivity,
+  examEntry,
+  taskActivityHint,
+  courseEntry,
 } from './domain';
 import { Cover, Empty, ErrorState, Loading, Modal, PageTitle, ProgressBar } from './ui';
 
@@ -83,6 +90,7 @@ export function HomePage() {
   const { data, user, go } = usePortal();
   const todo = data.tasks.filter((t) => !['已完成', '已到期', '未开始'].includes(taskStatus(t, data)));
   const resume = nextLearningCourse(data);
+  const summary=learningSummary(data);
   const completedTasks = data.tasks.filter((t) => taskStatus(t, data) === '已完成').length;
   const historyCount = data.progress.length + data.training.length + data.attempts.length;
   return (
@@ -116,7 +124,7 @@ export function HomePage() {
             )}
             <button
               className="btn primary"
-              onClick={() => go(resume ? `/course/${resume.id}?v=${resume.version}` : '/courses')}
+              onClick={() => go(resume ? courseEntry(resume,data).href : '/courses')}
             >
               {resume ? (percent(resume, data) > 0 ? '继续学习' : '开始学习') : '浏览课程'}
               <ArrowRight size={17} />
@@ -180,15 +188,15 @@ export function HomePage() {
           <strong>我的学习概览</strong>
         </div>
         <button onClick={() => go('/growth')}>
-          <b>{data.completed.length}</b>
-          <span>已完成课程</span>
+          <b>{summary.completedVersions}</b>
+          <span>完成课程版本</span>
         </button>
         <button onClick={() => go('/history')}>
-          <b>{data.training.length}</b>
-          <span>训练次数</span>
+          <b>{summary.trainingCount}</b>
+          <span>累计训练次数</span>
         </button>
         <button onClick={() => go('/history')}>
-          <b>{data.attempts.filter((a) => a.passed).length}</b>
+          <b>{summary.passedExams}</b>
           <span>通过考试</span>
         </button>
         <button className="strip-link" onClick={() => go('/my')}>
@@ -394,6 +402,7 @@ function TaskRow({ task }: { task: Task }) {
           </span>
         </div>
         <p>{task.description || '完成管理员指定的学习、训练和考试课程'}</p>
+        {status==='进行中'&&taskActivityHint(task,data)&&<p className="task-activity-hint">{taskActivityHint(task,data)}</p>}
         <div className="task-metadata">
           <span>
             <CalendarDays size={14} />
@@ -510,7 +519,7 @@ export function TaskDetail({ id }: { id: string }) {
     value = taskPercent(t, data);
   return (
     <>
-      <PageTitle title={t.title} description={t.description} back={() => go('/tasks')}>
+      <PageTitle title={t.title} description={t.description} back={() => go(returnDestination(location.hash,'/tasks'))}>
         <span className="badge blue">{status}</span>
       </PageTitle>
       <section className="task-detail-summary">
@@ -539,6 +548,7 @@ export function TaskDetail({ id }: { id: string }) {
         {t.snapshot.map((c, index) => {
           const done = data.completed.includes(key(c)),
             locked = t.sequential && t.snapshot.slice(0, index).some((p) => !data.completed.includes(key(p)));
+          const activity=phaseActivity(c,data);
           const inactive = status === '未开始' || status === '已到期';
           return (
             <div key={c.id} className={'path-row ' + (done ? 'completed' : '')}>
@@ -552,16 +562,16 @@ export function TaskDetail({ id }: { id: string }) {
                 <h3>{c.title}</h3>
                 <p>
                   课程版本 v{c.version} ·{' '}
-                  {done ? '已完成' : locked ? '完成前一阶段后解锁' : '准备好后即可开始'}
+                  {done ? '已完成' : locked ? '完成前一阶段后解锁' : activity.status}
                 </p>
               </div>
               <button
                 className={'btn ' + (!done && !locked ? 'primary' : '')}
                 disabled={!done && (locked || inactive)}
-                onClick={() => go(`/course/${c.id}?v=${c.version}`)}
+                onClick={() => go(withReturnTo(activity.href,location.hash))}
               >
                 {locked && !done ? <LockKeyhole size={15} /> : null}
-                {done ? '查看课程' : inactive ? status : locked ? '待解锁' : actions[c.kind]}
+                {done ? '查看课程' : inactive ? status : locked ? '待解锁' : activity.action}
                 {!locked && <ArrowRight size={16} />}
               </button>
             </div>
@@ -576,7 +586,7 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
   const v = version || data.courses.find((c) => c.id === id)?.version || 1;
   const remote = useRemote(() => api.course(id, v), [id, v]);
   const reviews = useRemote(() => api.reviews(id), [id]);
-  const [tab, setTab] = useState('intro'),
+  const [tab, setTab] = useState(()=>routeChoice(location.hash,'tab',['intro','outline','reviews'],'intro')),
     [busy, setBusy] = useState(false),
     [rules, setRules] = useState(false);
   const c = remote.value;
@@ -584,20 +594,22 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
   if (!c) return <Loading />;
   const done = percent(c, data),
     favorite = data.favorites.includes(id);
+  const exam=examEntry(c,data);
   const start = async () => {
     setBusy(true);
     try {
-      if (c.kind === 'learn') go(`/content/${c.id}?v=${c.version}`);
+      if (c.kind === 'learn') go(withReturnTo(`/content/${c.id}?v=${c.version}`,location.hash));
       else if (c.kind === 'exam') {
+        if(exam.exhausted&&exam.latest){go(withReturnTo('/exam/'+exam.latest.id,location.hash));return;}
         const a = await api.startExam(c);
-        go('/exam/' + a.id);
+        go(withReturnTo('/exam/' + a.id,location.hash));
       } else {
         const existing = data.training.find(
           (t) => t.courseId === id && t.version === v && t.status === 'active',
         );
         const s = existing || (await api.startTraining(c));
         await refresh();
-        go('/training/' + s.id);
+        go(withReturnTo('/training/' + s.id,location.hash));
       }
     } catch (e) {
       notify((e as Error).message, true);
@@ -607,7 +619,7 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
   };
   return (
     <>
-      <PageTitle title="课程详情" back={() => go('/courses')}>
+      <PageTitle title="课程详情" back={() => go(returnDestination(location.hash,'/courses'))}>
         <button
           className={'btn ' + (favorite ? 'selected' : '')}
           disabled={busy}
@@ -665,7 +677,7 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
             onClick={() => (c.kind === 'exam' ? setRules(true) : void start())}
           >
             {busy ? <Loader2 size={17} className="spin" /> : <Play size={16} fill="currentColor" />}
-            {busy ? '正在准备' : c.kind === 'learn' && done > 0 ? '继续学习' : actions[c.kind]}
+            {busy ? '正在准备' : c.kind === 'exam' ? exam.action : c.kind === 'learn' && done === 100 ? '重新学习' : c.kind === 'learn' && done > 0 ? '继续学习' : actions[c.kind]}
           </button>
         </div>
       </section>
@@ -677,7 +689,7 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
               ['outline', c.kind === 'learn' ? '课程目录' : c.kind === 'train' ? '训练要求' : '考试规则'],
               ['reviews', '学员评价'],
             ].map(([id, title]) => (
-              <button key={id} className={tab === id ? 'selected' : ''} onClick={() => setTab(id)}>
+              <button key={id} className={tab === id ? 'selected' : ''} onClick={() => {setTab(id);go(choiceRoute(location.hash,{tab:id}));}}>
                 {title}
               </button>
             ))}
@@ -708,7 +720,7 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
               c.kind === 'learn' ? (
                 <div className="lesson-list">
                   {c.lessons.map((l, index) => (
-                    <button key={l.id} onClick={() => go(`/content/${id}?v=${v}&lesson=${index}`)}>
+                    <button key={l.id} onClick={() => go(withReturnTo(`/content/${id}?v=${v}&lesson=${index}`,location.hash))}>
                       <span>{String(index + 1).padStart(2, '0')}</span>
                       <div>
                         <strong>{l.title}</strong>
@@ -807,7 +819,7 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
       </div>
       {rules && (
         <Modal
-          title="开始考试前请确认"
+          title={exam.exhausted?'考试次数已用完':'开始考试前请确认'}
           onClose={() => !busy && setRules(false)}
           footer={
             <>
@@ -815,7 +827,7 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
                 再准备一下
               </button>
               <button className="btn primary" disabled={busy} onClick={() => void start()}>
-                {busy ? '正在准备' : '开始考试'}
+                {busy ? '正在准备' : exam.action}
                 <ArrowRight size={16} />
               </button>
             </>
@@ -823,7 +835,7 @@ export function CourseDetail({ id, version }: { id: string; version: number }) {
         >
           <h3>{c.title}</h3>
           <ExamRules course={c} />
-          <div className="notice">开始后即计时。离开页面不会暂停考试，重新进入将恢复尚未结束的答卷。</div>
+          <div className="notice">{exam.exhausted?'本版本考试次数已用完，不能再开始新考试。可以查看最近答卷；已有合格记录继续有效。':'开始后即计时。离开页面不会暂停考试，重新进入将恢复尚未结束的答卷。'}</div>
         </Modal>
       )}
     </>
@@ -1043,92 +1055,19 @@ export function Profile({ onPasswordChanged }: { onPasswordChanged: () => void }
     </>
   );
 }
-export function Messages() {
-  const { data, go, run, refresh } = usePortal();
-  const [tab, setTab] = useState('all'),
-    [busy, setBusy] = useState(false);
-  const list = data.notifications.filter((n) => tab === 'all' || !n.read);
-  return (
-    <>
-      <PageTitle title="站内消息" description="与你相关的任务和学习结果。">
-        <button
-          className="btn"
-          disabled={busy || !data.notifications.some((n) => !n.read)}
-          onClick={async () => {
-            setBusy(true);
-            await run(async () => {
-              await api.readNotices(data.notifications.map((n) => n.id));
-              await refresh();
-            }, '已全部标为已读');
-            setBusy(false);
-          }}
-        >
-          <Check size={16} />
-          全部已读
-        </button>
-      </PageTitle>
-      <div className="plain-tabs message-tabs">
-        <button className={tab === 'all' ? 'selected' : ''} onClick={() => setTab('all')}>
-          全部消息
-        </button>
-        <button className={tab === 'unread' ? 'selected' : ''} onClick={() => setTab('unread')}>
-          未读 {data.notifications.filter((n) => !n.read).length}
-        </button>
-      </div>
-      <section className="messages-list">
-        {list.length ? (
-          list.map((n) => (
-            <button
-              key={n.id}
-              className={n.read ? '' : 'unread'}
-              onClick={() =>
-                void run(async () => {
-                  await api.readNotices([n.id]);
-                  await refresh();
-                  go(n.href);
-                })
-              }
-            >
-              <span className="soft-icon">
-                <Bell size={19} />
-              </span>
-              <div>
-                <strong>
-                  {n.title}
-                  {!n.read && <i className="unread-dot" />}
-                </strong>
-                <p>{n.text}</p>
-              </div>
-              <time>{dateTime(n.at)}</time>
-              <ChevronRight size={17} />
-            </button>
-          ))
-        ) : (
-          <Empty
-            title="暂无消息"
-            hint={tab === 'unread' ? '所有消息都已读完' : '新的任务与学习结果将在这里通知你'}
-          />
-        )}
-      </section>
-    </>
-  );
-}
+export {Messages} from './messages-page';
 export function History() {
-  const { data, go } = usePortal();
-  const [tab, setTab] = useState('learn');
-  const lessons = data.progress.map((p) => ({
-    id: p.courseId + ':' + p.lessonId,
-    title: data.courses.find((c) => c.id === p.courseId)?.title || '历史课程',
-    at: p.completed_at,
-    status: '课时已完成',
-    href: `/content/${p.courseId}?v=${p.version}`,
-  }));
+  const { data, go,user } = usePortal();
+  useEffect(()=>keepListScroll(user.tenantId+':'+user.memberId),[]);
+  const [tab, setTab] = useState(()=>routeChoice(location.hash,'tab',['learn','train','exam'],'learn'));
+  const lessons = learningHistory(data);
   const rows =
     tab === 'learn'
       ? lessons
       : tab === 'train'
         ? data.training.map((t) => ({
             id: t.id,
+            version:t.version,
             title: t.title,
             at: t.createdAt,
             status:
@@ -1141,6 +1080,7 @@ export function History() {
           }))
         : data.attempts.map((a) => ({
             id: a.id,
+            version:a.version,
             title: a.title,
             at: a.startedAt,
             status:
@@ -1160,7 +1100,7 @@ export function History() {
           ['train', '训练记录'],
           ['exam', '考试记录'],
         ].map(([id, title]) => (
-          <button key={id} className={tab === id ? 'selected' : ''} onClick={() => setTab(id)}>
+          <button key={id} className={tab === id ? 'selected' : ''} onClick={() => {setTab(id);go(choiceRoute(location.hash,{tab:id}));}}>
             {title}
           </button>
         ))}
@@ -1168,7 +1108,7 @@ export function History() {
       <div className="history-list">
         {rows.length ? (
           rows.map((r) => (
-            <button key={r.id} onClick={() => go(r.href)}>
+            <button key={r.id} onClick={() => go(withReturnTo(r.href,location.hash))}>
               <span className="soft-icon">
                 {tab === 'learn' ? (
                   <BookOpen size={20} />
@@ -1180,7 +1120,7 @@ export function History() {
               </span>
               <div>
                 <strong>{r.title}</strong>
-                <p>{dateTime(r.at)}</p>
+                <p>v{r.version} · {dateTime(r.at)}</p>
               </div>
               <span className="badge blue">{r.status}</span>
               <ChevronRight size={18} />
@@ -1199,12 +1139,13 @@ export function History() {
   );
 }
 export function Growth() {
-  const { data, go, run, refresh } = usePortal();
+  const { data, go, run, refresh,user } = usePortal();
+  useEffect(()=>keepListScroll(user.tenantId+':'+user.memberId),[]);
   const [edit, setEdit] = useState<Course | null>(null),
     [rating, setRating] = useState(5),
     [comment, setComment] = useState(''),
     [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState('ability');
+  const [tab, setTab] = useState(()=>routeChoice(location.hash,'tab',['ability','reviews'],'ability'));
   const evaluated = data.training.filter(
     (t) => ['completed', 'failed'].includes(t.status) && t.score !== null,
   );
@@ -1228,10 +1169,10 @@ export function Growth() {
         </button>
       </div>
       <nav className="workspace-tabs" aria-label="成长评价分类">
-        <button className={tab === 'ability' ? 'selected' : ''} onClick={() => setTab('ability')}>
+        <button className={tab === 'ability' ? 'selected' : ''} onClick={() => {setTab('ability');go(choiceRoute(location.hash,{tab:'ability'}));}}>
           训练综合评价
         </button>
-        <button className={tab === 'reviews' ? 'selected' : ''} onClick={() => setTab('reviews')}>
+        <button className={tab === 'reviews' ? 'selected' : ''} onClick={() => {setTab('reviews');go(choiceRoute(location.hash,{tab:'reviews'}));}}>
           课程评价
         </button>
       </nav>
@@ -1249,14 +1190,15 @@ export function Growth() {
                     {Math.round(evaluated.reduce((n, t) => n + (t.score || 0), 0) / evaluated.length)}
                     <small>/100</small>
                   </strong>
-                  <p>来自 {evaluated.length} 次真实训练评价</p>
+                  <p>来自 {evaluated.length} 次已完成评价的训练</p>
                 </div>
               </div>
               {evaluated.map((t) => (
-                <button className="evaluation-row" key={t.id} onClick={() => go('/recap/' + t.id)}>
+                <button className="evaluation-row" key={t.id} onClick={() => go(withReturnTo('/recap/' + t.id,location.hash))}>
                   <CheckCircle2 size={20} />
                   <div>
                     <strong>{t.title}</strong>
+                    <small className="muted">v{t.version} · {dateTime(t.createdAt)}</small>
                     <p>{t.evaluation?.feedback || '查看评价与复盘'}</p>
                   </div>
                   <b>{t.score} 分</b>
@@ -1365,7 +1307,7 @@ export function Growth() {
   );
 }
 export function Leaderboard() {
-  const { user } = usePortal();
+  const { user,go } = usePortal();
   const remote = useRemote(() =>
     api.request<{
       items: {
@@ -1380,7 +1322,7 @@ export function Leaderboard() {
       }[];
     }>('/learn/leaderboard'),
   );
-  const [mode, setMode] = useState('people');
+  const [mode, setMode] = useState(()=>routeChoice(location.hash,'mode',['people','teams'],'people'));
   if (remote.error) return <ErrorState message={remote.error} retry={remote.retry} />;
   if (!remote.value) return <Loading />;
   const items = remote.value.items;
@@ -1405,10 +1347,10 @@ export function Leaderboard() {
     <>
       <PageTitle title="学习排行榜" description="按完成任务、学习课时和通过考试数量依次排序。" />
       <div className="large-tabs">
-        <button className={mode === 'people' ? 'selected' : ''} onClick={() => setMode('people')}>
+        <button className={mode === 'people' ? 'selected' : ''} onClick={() => {setMode('people');go(choiceRoute(location.hash,{mode:'people'}));}}>
           个人排行
         </button>
-        <button className={mode === 'teams' ? 'selected' : ''} onClick={() => setMode('teams')}>
+        <button className={mode === 'teams' ? 'selected' : ''} onClick={() => {setMode('teams');go(choiceRoute(location.hash,{mode:'teams'}));}}>
           部门排行
         </button>
       </div>
@@ -1422,8 +1364,8 @@ export function Leaderboard() {
         </div>
         {rows.map((r, index) => (
           <div className={'ranking-row ' + (r.isMe ? 'is-me' : '')} key={r.id}>
-            <span className={index < 3 ? 'rank-medal' : ''}>
-              {index < 3 ? <Trophy size={20} /> : index + 1}
+            <span className={index < 3 ? `rank-medal rank-${index+1}` : ''}>
+              {index < 3 && <Trophy size={20} aria-hidden="true"/>}{index + 1}
             </span>
             <div>
               <strong>
@@ -1438,7 +1380,7 @@ export function Leaderboard() {
           </div>
         ))}
       </div>
-      <p className="muted footnote">展示当前企业已启用成员的累计学习数据，最多显示 100 位学员。</p>
+      <p className="muted footnote">{mode==='teams'?'部门排行按当前榜单最多100名已启用成员汇总。':'展示当前企业已启用成员的累计学习数据，最多显示100位学员。'}</p>
     </>
   );
 }

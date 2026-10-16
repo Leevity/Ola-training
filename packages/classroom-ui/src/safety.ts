@@ -39,5 +39,5 @@ export function cleanScene(value:unknown,client:'admin'|'learner'='learner'):Cla
 export function sandboxHtml(html:string){
  const policy="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'";
  // Put CSP before generated content; sandbox grants scripts only and keeps an opaque origin.
- return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${html}</body></html>`;
+ return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${html}<style>html,body{min-height:0!important;height:auto!important}</style><script>(function(){let pending=false,last=0;function report(){if(pending)return;pending=true;requestAnimationFrame(function(){pending=false;const height=Math.ceil(Math.max(document.body.scrollHeight,document.body.getBoundingClientRect().height));if(height!==last){last=height;parent.postMessage({type:'ola-widget-height',height:height},'*');}});}new ResizeObserver(report).observe(document.body);window.addEventListener('load',report);report();})();</script></body></html>`;
 }

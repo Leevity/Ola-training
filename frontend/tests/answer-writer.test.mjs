@@ -21,3 +21,14 @@ test('普通网络错误保留原修订可重试，不误当成远端冲突',asy
  let calls=0;const revisions=[];const writer=new ExamAnswerWriter(7,async(_,revision)=>{revisions.push(revision);calls++;if(calls===1)throw new Error('offline');return {revision:8};});
  await assert.rejects(writer.save({q:['A']}));assert.equal(writer.locked,false);await writer.save({q:['A']});assert.deepEqual(revisions,[7,7]);assert.equal(writer.revision,8);
 });
+
+test('交卷发现远端冲突后停止待发送保存，普通交卷断网仍允许重试',async()=>{
+ let calls=0;const writer=new ExamAnswerWriter(4,async()=>{calls++;return {revision:5};});
+ writer.lockOnConflict(new Error('offline'));assert.equal(writer.locked,false);
+ const queued=writer.save({q:['本地旧答案']});
+ writer.lockOnConflict(Object.assign(new Error('答卷已更新'),{status:409,code:'ANSWER_CONFLICT'}));
+ await assert.rejects(queued,/答卷已更新/);assert.equal(calls,0);assert.equal(writer.revision,4);
+ await assert.rejects(writer.save({q:['不可覆盖']}));assert.equal(calls,0);
+ const reloaded=new ExamAnswerWriter(5,async(_,revision)=>{assert.equal(revision,5);return {revision:6};});
+ await reloaded.save({q:['核对服务端后重新作答']});assert.equal(reloaded.locked,false);assert.equal(reloaded.revision,6);
+});

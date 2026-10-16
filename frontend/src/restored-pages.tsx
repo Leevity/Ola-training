@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import {routeChoice,choiceRoute} from '../../shared/learner-navigation';
 import {
   Bell,
   BookOpen,
@@ -34,6 +35,8 @@ import {
   key,
   learningSummary,
   nextLearningCourse,
+  phaseActivity,
+  taskActivityHint,
 } from "./domain";
 type Nav = { go: (path: string) => void; back: () => void };
 const kinds: Kind[] = ["learn", "train", "exam"];
@@ -55,7 +58,7 @@ export function HomePage({ go }: Nav) {
   const banners = [
     {
       image: "home-banner.webp",
-      title: "让 AI 成为你的工作伙伴",
+      title: "AI 助力成长",
       sub: "每天进步一点点",
     },
     {
@@ -183,17 +186,27 @@ export function CourseCenter({
   favoritesOnly = false,
 }: Nav & { searchOnly?: boolean; favoritesOnly?: boolean }) {
   const { data } = usePortal();
+  const initialFilters = new URLSearchParams(location.hash.split("?")[1]);
   const [kind, setKind] = useState<Kind>(() =>
-      new URLSearchParams(location.hash.split("?")[1]).get("kind") === "train"
-        ? "train"
-        : "learn",
+      initialFilters.get("kind") === "train" ? "train" : initialFilters.get("kind") === "exam" ? "exam" : "learn",
     ),
-    [status, setStatus] = useState("todo"),
-    [mode, setMode] = useState("人机训练"),
-    [category, setCategory] = useState("全部"),
-    [query, setQuery] = useState(""),
-    [latest, setLatest] = useState(false);
+    [status, setStatus] = useState(() => ['all','todo','done'].includes(initialFilters.get('status') || '') ? initialFilters.get('status')! : 'all'),
+    [mode, setMode] = useState(() => initialFilters.get('mode') || '全部'),
+    [category, setCategory] = useState(() => initialFilters.get('category') || '全部'),
+    [query, setQuery] = useState(() => initialFilters.get('q') || ''),
+    [latest, setLatest] = useState(() => initialFilters.get('sort') === 'latest');
   const special = searchOnly || favoritesOnly;
+  useEffect(() => {
+    if (special) return;
+    const filters = new URLSearchParams();
+    if (kind !== 'learn') filters.set('kind', kind);
+    if (status !== 'all') filters.set('status', status);
+    if (category !== '全部') filters.set('category', category);
+    if (mode !== '全部') filters.set('mode', mode);
+    if (query) filters.set('q', query);
+    if (latest) filters.set('sort', 'latest');
+    history.replaceState(history.state, '', `${location.pathname}${location.search}#/courses${filters.size ? `?${filters}` : ''}`);
+  }, [special, kind, status, category, mode, query, latest]);
   const base = data.courses.filter(
     (c) =>
       (special || c.kind === kind) &&
@@ -216,7 +229,7 @@ export function CourseCenter({
     .filter(
       (c) =>
         special ||
-        (status === "done" ? percent(c, data) === 100 : percent(c, data) < 100),
+        (status === "done" ? percent(c, data) === 100 : status === 'todo' ? percent(c, data) < 100 : true),
     )
     .sort((a, b) =>
       latest ? Date.parse(b.updatedAt) - Date.parse(a.updatedAt) : 0,
@@ -225,7 +238,9 @@ export function CourseCenter({
   const reset = () => {
     setCategory("全部");
     setQuery("");
-    setMode("人机训练");
+    setMode("全部");
+    setStatus('all');
+    setLatest(false);
   };
   return (
     <Page tab={special ? undefined : "courses"} go={go} className="course-page">
@@ -247,7 +262,7 @@ export function CourseCenter({
                 className={kind === k ? "selected" : ""}
                 onClick={() => {
                   setKind(k);
-                  setStatus("todo");
+                  setStatus("all");
                   reset();
                 }}
               >
@@ -284,7 +299,7 @@ export function CourseCenter({
                     className={mode === m ? "selected" : ""}
                     onClick={() => {
                       setMode(m);
-                      setStatus("todo");
+                      setStatus("all");
                     }}
                   >
                     {m}
@@ -329,7 +344,13 @@ export function CourseCenter({
           {!special && (
             <div className="status-switch">
               <button
+                className={status === 'all' ? 'selected' : ''}
+                aria-pressed={status === 'all'}
+                onClick={() => setStatus('all')}
+              >全部</button>
+              <button
                 className={status === "todo" ? "selected" : ""}
+                aria-pressed={status === 'todo'}
                 onClick={() => setStatus("todo")}
               >
                 {kind === "learn"
@@ -340,6 +361,7 @@ export function CourseCenter({
               </button>
               <button
                 className={status === "done" ? "selected" : ""}
+                aria-pressed={status === 'done'}
                 onClick={() => setStatus("done")}
               >
                 已完成
@@ -359,10 +381,10 @@ export function CourseCenter({
           </div>
         ) : (
           <Empty
-            title="当前没有符合条件的课程"
-            hint="可切换分类、状态或清空搜索查看其他内容"
-            action="清空筛选"
-            onAction={reset}
+            title={base.length === 0 ? '暂无课程' : !query && category === '全部' && status === 'todo' && filtered.length > 0 ? '当前课程都已完成' : '当前没有符合条件的课程'}
+            hint={base.length === 0 ? '管理员发布课程后会显示在这里。' : status === 'todo' && filtered.some(c => percent(c, data) === 100) ? '可查看已完成课程，继续复习。' : '调整关键词或筛选条件，查看其他内容。'}
+            action={base.length === 0 ? undefined : status === 'todo' && !query && category === '全部' && filtered.some(c => percent(c, data) === 100) ? '查看已完成' : '查看全部课程'}
+            onAction={base.length === 0 ? undefined : status === 'todo' && !query && category === '全部' && filtered.some(c => percent(c, data) === 100) ? () => setStatus('done') : reset}
           />
         )}
       </main>
@@ -402,6 +424,7 @@ function TaskCard({ task: t, go }: { task: Task; go: Nav["go"] }) {
         </span>
       </div>
       <Progress value={taskPercent(t, data)} />
+      {status==='进行中'&&taskActivityHint(t,data)&&<p className="task-activity-hint">{taskActivityHint(t,data)}</p>}
       <div className="task-card-footer">
         {status === "已完成"
           ? "查看任务"
@@ -415,9 +438,18 @@ function TaskCard({ task: t, go }: { task: Task; go: Nav["go"] }) {
 }
 export function TaskCenter({ go }: Nav) {
   const { data } = usePortal();
-  const [status, setStatus] = useState(()=>new URLSearchParams(location.hash.split('?')[1]).get('status')==='done'?'done':'todo'),
-    [search, setSearch] = useState(""),
-    [filter, setFilter] = useState(false);
+  const initialFilters = new URLSearchParams(location.hash.split('?')[1]);
+  const [status, setStatus] = useState(()=>initialFilters.get('status')==='done'?'done':'todo'),
+    [search, setSearch] = useState(() => initialFilters.get('q') || ''),
+    [filter, setFilter] = useState(() => initialFilters.get('filter') === 'active');
+  useEffect(() => {
+    const filters = new URLSearchParams();
+    if (status === 'done') filters.set('status', 'done');
+    if (search) filters.set('q', search);
+    if (filter) filters.set('filter', 'active');
+    const route = location.hash.startsWith('#/my/tasks') ? '/my/tasks' : '/tasks';
+    history.replaceState(history.state, '', `${location.pathname}${location.search}#${route}${filters.size ? `?${filters}` : ''}`);
+  }, [status, search, filter]);
   const pending = data.tasks.filter((t) => taskStatus(t, data) !== "已完成");
   const today = new Date().toLocaleDateString("sv-SE");
   const soon = pending.filter(
@@ -472,12 +504,14 @@ export function TaskCenter({ go }: Nav) {
           <div className="plain-tabs">
             <button
               className={status === "todo" ? "selected" : ""}
+              aria-pressed={status === 'todo'}
               onClick={() => setStatus("todo")}
             >
               待办
             </button>
             <button
               className={status === "done" ? "selected" : ""}
+              aria-pressed={status === 'done'}
               onClick={() => setStatus("done")}
             >
               已完成
@@ -485,6 +519,7 @@ export function TaskCenter({ go }: Nav) {
           </div>
           <button
             className={filter ? "filter selected" : "filter"}
+            aria-pressed={filter}
             onClick={() => setFilter((v) => !v)}
           >
             <Filter size={17} />
@@ -496,13 +531,10 @@ export function TaskCenter({ go }: Nav) {
             visible.map((t) => <TaskCard key={t.id} task={t} go={go} />)
           ) : (
             <Empty
-              title="没有找到任务"
-              hint="试试调整关键词或清除筛选条件"
-              action="清空筛选"
-              onAction={() => {
-                setSearch("");
-                setFilter(false);
-              }}
+              title={search || filter ? '没有符合条件的任务' : status === 'todo' && data.tasks.length > 0 && pending.length === 0 ? '任务已全部完成' : status === 'done' ? '还没有已完成的任务' : '暂无待办任务'}
+              hint={search || filter ? '调整关键词或筛选条件再试。' : status === 'todo' && data.tasks.length > 0 && pending.length === 0 ? '已完成的任务可以随时查看和复习。' : '有新的任务分配后会显示在这里。'}
+              action={search || filter ? '清空筛选' : status === 'todo' && data.tasks.length > 0 && pending.length === 0 ? '查看已完成' : undefined}
+              onAction={search || filter ? () => { setSearch(''); setFilter(false); } : status === 'todo' && data.tasks.length > 0 && pending.length === 0 ? () => setStatus('done') : undefined}
             />
           )}
         </div>
@@ -513,13 +545,10 @@ export function TaskCenter({ go }: Nav) {
 export function TaskDetail({ id, go, back }: Nav & { id: string }) {
   const { data } = usePortal();
   const t = data.tasks.find((t) => t.id === id);
-  const stageChosen=useRef(false);
   const [stage, setStage] = useState<Kind>(
-    () =>
-      t?.snapshot.find((c) => !data.completed.includes(key(c)))?.kind ||
-      "learn",
+    () => routeChoice(location.hash,'stage',kinds,t?.snapshot.find((c) => !data.completed.includes(key(c)))?.kind || 'learn') as Kind,
   );
-  useEffect(()=>{if(!stageChosen.current)setStage(t?.snapshot.find(c=>!data.completed.includes(key(c)))?.kind||'learn');},[id,data.completed.join('|')]);
+  useEffect(()=>setStage(routeChoice(location.hash,'stage',kinds,t?.snapshot.find(c=>!data.completed.includes(key(c)))?.kind||'learn') as Kind),[id,location.hash,data.completed.join('|')]);
   if (!t)
     return (
       <Page go={go}>
@@ -559,11 +588,12 @@ export function TaskDetail({ id, go, back }: Nav & { id: string }) {
               data.completed.includes(key(c)),
             ).length;
           const lockedStage=list.length>0&&t.sequential&&t.snapshot.slice(0,t.snapshot.indexOf(list[0])).some(c=>!data.completed.includes(key(c)));
+          const activeStage=list.map(c=>phaseActivity(c,data).status).find(s=>s!=='待开始'&&s!=='已完成');
           return (
             <button
               key={k}
               className={stage === k ? "selected" : ""}
-              onClick={() => {stageChosen.current=true;setStage(k);}}
+              onClick={() => {setStage(k);go(choiceRoute(location.hash,{stage:k}));}}
             >
               <span className="stage-num">0{i + 1}</span>
               <span>
@@ -575,7 +605,7 @@ export function TaskDetail({ id, go, back }: Nav & { id: string }) {
                       ? "已完成"
                       : completed
                         ? "进行中"
-                        : lockedStage ? '待解锁' : "待开始"}
+                        : lockedStage ? '待解锁' : activeStage==='待评价'||activeStage==='待阅卷'?activeStage:activeStage?'进行中':"待开始"}
                 </small>
               </span>
               <em>
@@ -604,12 +634,13 @@ export function TaskDetail({ id, go, back }: Nav & { id: string }) {
             const current = data.courses.find(
               (x) => x.id === c.id && x.version === c.version,
             );
+            const activity=phaseActivity(c,data);
             return (
               <button
                 className="task-course-row"
                 key={key(c)}
                 disabled={blocked && !finished}
-                onClick={() => go(`/course/${c.id}?v=${c.version}`)}
+                onClick={() => go(activity.href)}
               >
                 <div className="task-row-cover">
                   <img
@@ -627,16 +658,17 @@ export function TaskDetail({ id, go, back }: Nav & { id: string }) {
                 <div className="task-row-body">
                   <div>
                     <strong>{c.title}</strong>
-                    <span className={`status ${finished ? "success" : "blue"}`}>
+                    <span className={`status ${finished ? "success" : blocked ? "muted" : "blue"}`}>
                       {finished
                         ? "已完成"
                         : locked
                           ? "待解锁"
                           : status === "未开始" || status === "已到期"
                             ? status
-                            : "待开始"}
+                            : activity.status}
                     </span>
                   </div>
+                  {locked&&!finished&&<p className="task-lock-hint">完成前一阶段后解锁</p>}
                   <div className="inline-progress">
                     <Progress
                       value={
@@ -654,7 +686,7 @@ export function TaskDetail({ id, go, back }: Nav & { id: string }) {
                         ? "暂不可开始"
                         : finished
                           ? "查看课程"
-                          : "开始课程"}
+                          : activity.action}
                       <ChevronRight size={15} />
                     </b>
                   </footer>

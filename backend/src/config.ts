@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { config as dotenv } from 'dotenv';
 dotenv({path:resolve(process.cwd(),'.env.local')});
 dotenv({path:resolve(process.cwd(),'.env')});
-export type Config = {production:boolean;host:string;port:number;origin:string;learnerOrigin?:string;mobileOrigin?:string;allowedOrigins?:string[];dataDir:string;databaseUrl?:string;adminEmail:string;adminPassword?:string;sessionHours:number;openmaicUrl?:string;bridgeSecret?:string;seedDemo:boolean;aiEncryptionKey?:string};
+export type Config = {production:boolean;host:string;port:number;origin:string;learnerOrigin?:string;mobileOrigin?:string;allowedOrigins?:string[];dataDir:string;databaseUrl?:string;adminEmail:string;adminPassword?:string;sessionHours:number;openmaicUrl?:string;bridgeSecret?:string;seedDemo:boolean;aiEncryptionKey?:string;aiRequestTimeoutMs?:number};
 export function readConfig():Config {
   const production=process.env.NODE_ENV==='production';
   const config:Config={production,host:process.env.HOST||'127.0.0.1',port:Number(process.env.PORT||4190),origin:process.env.ADMIN_ORIGIN||'http://127.0.0.1:4180',dataDir:resolve(process.env.DATA_DIR||'./data'),databaseUrl:process.env.DATABASE_URL||undefined,adminEmail:process.env.BOOTSTRAP_ADMIN_EMAIL||'admin@ola.local',adminPassword:process.env.BOOTSTRAP_ADMIN_PASSWORD||undefined,sessionHours:Number(process.env.SESSION_HOURS||12),openmaicUrl:process.env.OPENMAIC_URL||undefined,bridgeSecret:process.env.OLA_BRIDGE_SECRET||undefined,seedDemo:!production};
@@ -12,7 +12,7 @@ export function readConfig():Config {
   if(production&&!config.origin.startsWith('https://'))throw new Error('Production requires HTTPS ADMIN_ORIGIN');
   config.learnerOrigin=process.env.LEARNER_ORIGIN||(!production?'http://127.0.0.1:4181':undefined);
   config.mobileOrigin=process.env.MOBILE_ORIGIN||(!production?'http://127.0.0.1:4173':undefined);
-  config.allowedOrigins=[...new Set((process.env.EXTRA_ALLOWED_ORIGINS||'').split(',').map(value=>value.trim()).filter(Boolean))];
+  config.allowedOrigins=[...new Set([...(process.env.EXTRA_ALLOWED_ORIGINS||'').split(',').map(value=>value.trim()).filter(Boolean),...(!production?['http://localhost:4173','http://localhost:4180','http://localhost:4181']:[])])];
   for(const origin of config.allowedOrigins){
     const parsed=new URL(origin);
     if(!['http:','https:'].includes(parsed.protocol)||parsed.origin!==origin)throw new Error('EXTRA_ALLOWED_ORIGINS requires exact HTTP(S) origins');
@@ -20,6 +20,8 @@ export function readConfig():Config {
   }
   if(production&&config.mobileOrigin&&!config.mobileOrigin.startsWith('https://'))throw new Error('Production requires HTTPS MOBILE_ORIGIN');
   config.aiEncryptionKey=process.env.AI_CONFIG_ENCRYPTION_KEY||undefined;
+  config.aiRequestTimeoutMs=Number(process.env.AI_REQUEST_TIMEOUT_MS||90000);
+  if(!Number.isInteger(config.aiRequestTimeoutMs)||config.aiRequestTimeoutMs<1000||config.aiRequestTimeoutMs>180000)throw new Error('AI_REQUEST_TIMEOUT_MS must be 1000..180000');
   if(config.aiEncryptionKey&&!/^[a-fA-F0-9]{64}$/.test(config.aiEncryptionKey))throw new Error('AI_CONFIG_ENCRYPTION_KEY must be 64 hex characters');
   if(production&&config.learnerOrigin&&!config.learnerOrigin.startsWith('https://'))throw new Error('Production requires HTTPS LEARNER_ORIGIN');
   if(config.adminPassword&&config.adminPassword.length<12)throw new Error('BOOTSTRAP_ADMIN_PASSWORD must contain at least 12 characters');

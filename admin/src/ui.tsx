@@ -108,6 +108,11 @@ export function Modal({
         ).filter((el) => el.getClientRects().length);
         const first = nodes[0],
           last = nodes[nodes.length - 1];
+        if (!ref.current?.contains(document.activeElement)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first)?.focus();
+          return;
+        }
         if (
           e.shiftKey &&
           (document.activeElement === first ||

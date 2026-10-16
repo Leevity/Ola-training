@@ -3,7 +3,7 @@ import type { Readable } from 'node:stream';
 import { DOMParser } from '@xmldom/xmldom';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { Database } from './db.ts';
 import type { Config } from './config.ts';
@@ -21,9 +21,12 @@ async function zipText(file:JSZip.JSZipObject):Promise<string>{
   stream.on('error',reject);stream.on('end',()=>resolve(Buffer.concat(chunks).toString('utf8')));
  });
 }
-function xmlParagraphs(xml:string){
+function parseOfficeXml(xml:string){
  if(/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('不支持包含外部实体的 XML');
- const document=new DOMParser({onError:(level)=>{if(level!=='warning')throw new Error('Office XML 格式不正确');}}).parseFromString(xml,'application/xml');
+ return new DOMParser({onError:(level)=>{if(level!=='warning')throw new Error('Office XML 格式不正确');}}).parseFromString(xml,'application/xml');
+}
+function xmlParagraphs(xml:string){
+ const document=parseOfficeXml(xml);
  const paragraphs=Array.from(document.getElementsByTagName('*')).filter(n=>n.localName==='p');
  return paragraphs.map(p=>Array.from(p.getElementsByTagName('*')).filter(n=>n.localName==='t').map(n=>n.textContent||'').join('')).filter(Boolean).join('\n');
 }
@@ -32,9 +35,31 @@ export async function extractMaterial(name:string,buffer:Buffer):Promise<Unit[]>
  if(extension==='txt'||extension==='md')units=[{page:1,text:new TextDecoder('utf-8',{fatal:true}).decode(buffer)}];
  else if(extension==='docx'||extension==='pptx'){
   const archive=await JSZip.loadAsync(buffer,{checkCRC32:false});
-  const names=Object.keys(archive.files).filter(path=>extension==='docx'?path==='word/document.xml':/^ppt\/slides\/slide\d+\.xml$/.test(path)).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  let total=0;
+  const readXml=async(path:string)=>{const file=archive.files[path];if(!file||file.dir)throw new Error('Office 文档缺少正文或页面引用无效');const xml=await zipText(file);total+=Buffer.byteLength(xml);if(total>MAX_EXPANDED)throw new Error('Office 文档解压内容超过限制');return xml;};
+  let names=['word/document.xml'];
+  if(extension==='pptx'){
+   const presentation=parseOfficeXml(await readXml('ppt/presentation.xml'));
+   const relations=parseOfficeXml(await readXml('ppt/_rels/presentation.xml.rels'));
+   const links=new Map<string,string>();
+   for(const relation of Array.from(relations.getElementsByTagName('*')).filter(n=>n.localName==='Relationship')){
+    if(!relation.getAttribute('Type')?.endsWith('/slide'))continue;
+    const key=relation.getAttribute('Id')||'',target=relation.getAttribute('Target')||'';
+    if(!key||links.has(key)||relation.getAttribute('TargetMode')==='External'||/[:\\?#]/.test(target))throw new Error('Office 幻灯片引用无效');
+    const path=posix.normalize(target.startsWith('/')?target.slice(1):posix.join('ppt',target));
+    if(!/^ppt\/slides\/[^/]+\.xml$/.test(path))throw new Error('Office 幻灯片引用无效');
+    links.set(key,path);
+   }
+   const slides=Array.from(presentation.getElementsByTagName('*')).filter(n=>n.localName==='sldId'&&n.parentNode?.nodeName.split(':').pop()==='sldIdLst');
+   if(slides.length>500)throw new Error('Office 文档页数超过500页');
+   names=slides.map(slide=>{
+    const key=Array.from(slide.attributes).find(attribute=>attribute.localName==='id'&&attribute.namespaceURI)?.value;
+    const path=key&&links.get(key);if(!path)throw new Error('Office 幻灯片顺序引用缺失');return path;
+   });
+   if(new Set(names).size!==names.length)throw new Error('Office 幻灯片顺序引用重复');
+  }
   if(!names.length||names.length>500)throw new Error('Office 文档缺少正文或页数超过500页');
-  let total=0;for(const [i,path] of names.entries()){const xml=await zipText(archive.files[path]);total+=Buffer.byteLength(xml);if(total>MAX_EXPANDED)throw new Error('Office 文档解压内容超过限制');units.push({page:i+1,text:xmlParagraphs(xml)});}
+  for(const [i,path] of names.entries()){units.push({page:i+1,text:xmlParagraphs(await readXml(path))});}
  }else if(extension==='pdf'){
   const {getDocument}=await import('pdfjs-dist/legacy/build/pdf.mjs');
   const task=getDocument({data:new Uint8Array(buffer),useSystemFonts:false,isEvalSupported:false,useWorkerFetch:false});

@@ -157,7 +157,7 @@ export const leaderboard = () =>
     }[];
   }>("/learn/leaderboard");
 
-export { ExamAnswerWriter } from "./answer-writer";
+export { ExamAnswerWriter } from "./answer-writer.ts";
 
 export async function prepareKnowledgeDownload(
   id: string,

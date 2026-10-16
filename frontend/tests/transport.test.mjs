@@ -4,6 +4,12 @@ import {LearnerTransport} from '../../packages/learner-client/src/transport.ts';
 const user={id:'account-a',tenantId:'enterprise-a',memberId:'member-a'};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
 
+test('网络中断显示可操作中文提示，不自动重放写入或清除有效身份',async()=>{
+ let calls=0;const transport=new LearnerTransport({fetch:async()=>{calls++;throw new TypeError('Failed to fetch');},onExpired:()=>assert.fail()});transport.setSession(user,'csrf-a');
+ await assert.rejects(transport.request('/learn/progress','POST',{eventId:'same'}),error=>error.code==='NETWORK_ERROR'&&error.status===0&&error.message.includes('请检查网络后重试'));
+ assert.equal(calls,1);assert.equal(transport.csrf,'csrf-a');assert.equal(transport.context,'account-a:enterprise-a:member-a');
+});
+
 test('学员请求携带当前成员企业上下文和CSRF，me不绑定旧上下文',async()=>{
  const calls=[];const transport=new LearnerTransport({fetch:async(url,options)=>{calls.push({url,options});return json({ok:true});},onExpired:()=>assert.fail()});transport.setSession(user,'csrf-a');
  await transport.request('/learn/progress','POST',{version:1});await transport.request('/auth/me');

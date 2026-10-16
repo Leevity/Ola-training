@@ -2,7 +2,7 @@ import { randomId } from '../../../shared/random-id.ts';
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as api from "@ola/learner-client";
 import type { Chat, Overview, Source, User } from "@ola/learner-client/types";
-import { percent } from "../../../shared/learner-domain.ts";
+import { percent, courseEntry } from "../../../shared/learner-domain.ts";
 
 type Icons = {
   history: ReactNode;
@@ -188,11 +188,12 @@ export function LearnerAssistant({
         (c) => c.id === source.id && c.version === source.version,
       ),
       progress = c ? percent(c, data) : (source.progress ?? 0);
+    const entry=c?courseEntry(c,data):{action:'查看课程',href:`/course/${source.id}?v=${source.version||1}`,status:progress===100?'已完成课程':'查看课程信息'};
     return (
       <button
         className="assistant-course"
         key={source.id + ":" + source.version}
-        onClick={() => go(`/course/${source.id}?v=${source.version || 1}`)}
+        onClick={() => go(entry.href)}
       >
         <img
           src={c?.cover || source.cover || "/assets/course-communication.webp"}
@@ -205,7 +206,7 @@ export function LearnerAssistant({
         <span className="assistant-course-copy">
           <strong>{source.title}</strong>
           <small>
-            {progress === 100
+            {c?.kind!=='learn'?entry.status:progress === 100
               ? "已完成学习"
               : progress
                 ? "继续上次学习"
@@ -219,7 +220,7 @@ export function LearnerAssistant({
           </span>
         </span>
         <span className="assistant-course-action">
-          {progress === 100 ? "查看课程" : progress ? "继续学习" : "开始学习"}
+          {entry.action}
           {icons.arrow}
         </span>
       </button>
@@ -252,10 +253,10 @@ export function LearnerAssistant({
             <h1>ola</h1>
             <p>学习与工作，一问就知道</p>
           </div>
-          <button onClick={() => setHistoryOpen(true)}>
+          {!desktop&&<button onClick={() => setHistoryOpen(true)}>
             {icons.history}
             <span>历史</span>
-          </button>
+          </button>}
         </header>
         <nav className="assistant-app-tabs" aria-label="知识应用">
           {[
@@ -410,9 +411,8 @@ export function LearnerAssistant({
             <button
               type="button"
               aria-label="图片提问暂未开放"
-              onClick={() =>
-                notify("图片识别尚未开放，请输入文字描述你的问题。")
-              }
+              title="图片提问暂未开放，请使用文字输入"
+              disabled
             >
               {icons.camera}
             </button>
@@ -440,7 +440,8 @@ export function LearnerAssistant({
                 type="button"
                 className="assistant-mic"
                 aria-label="语音输入暂未开放"
-                onClick={() => notify("语音输入尚未开放，请使用文字提问。")}
+                title="语音输入暂未开放，请使用文字输入"
+                disabled
               >
                 {icons.mic}
               </button>

@@ -1,12 +1,12 @@
 import { ConfirmationDialog } from "./confirmation-dialog";
 import { registerLeaveGuard } from "../../shared/navigation-guard";
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Clock3, ChevronRight } from "lucide-react";
+import { CheckCircle2, CircleAlert, Clock3, ChevronRight } from "lucide-react";
 import * as api from "@ola/learner-client";
 import type { Attempt } from "@ola/learner-client/types";
 import { Page, Topbar, FixedAction, Progress } from "./ui";
 import { usePortal, useRemote, Loading, ErrorState } from "./portal";
-import { secondsLeft } from "./domain";
+import { secondsLeft, examEntry } from "./domain";
 
 const labels = {
   single: "单选题",
@@ -24,7 +24,7 @@ export function ExamPage({
   go: (path: string) => void;
   back: () => void;
 }) {
-  const { data, refresh } = usePortal();
+  const { data, refresh, notify } = usePortal();
   const summary = data.attempts.find((a) => a.id === id);
   const remote = useRemote(() => api.attempt(id), [id]);
   const [attempt, setAttempt] = useState<Attempt | null>(null),
@@ -32,6 +32,7 @@ export function ExamPage({
     [index, setIndex] = useState(0),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [submitFailed, setSubmitFailed] = useState(false),
     [saveStatus, setSaveStatus] = useState("答案已同步"),
     [confirm, setConfirm] = useState(false),
     [cardOpen, setCardOpen] = useState(false),
@@ -65,6 +66,7 @@ export function ExamPage({
     dirty.current = false;
     active.current = value.status === "active";
     setError("");
+    setSubmitFailed(false);
     setSaveStatus("答案已同步");
     clockOffset.current = value.serverNow
       ? Date.parse(value.serverNow) - Date.now()
@@ -143,6 +145,7 @@ export function ExamPage({
     setBusy(true);
     setConfirm(false);
     setError("");
+    setSubmitFailed(false);
     clearTimeout(timer.current);
     expired =
       expired ||
@@ -162,7 +165,20 @@ export function ExamPage({
       setAnswers(result.answers);
       await refresh();
     } catch (e) {
-      setError((e as Error).message);
+      if((e as {status?:number})?.status===0){
+        try{
+          const confirmed=await api.attempt(id);
+          if(confirmed.status!=='active'){
+            active.current=false;dirty.current=false;
+            setAttempt(confirmed);setAnswers(confirmed.answers);
+            await refresh().catch(()=>{});notify('已从服务端确认交卷结果');return;
+          }
+        }catch{/* Confirmation is read-only; keep the original failure if it is unavailable. */}
+      }
+      writer.current?.lockOnConflict(e);
+      if(writer.current?.locked)setSaveStatus("答卷有更新，请先重新加载");
+      setSubmitFailed(true);
+      setError((e as Error)?.message || '交卷未完成，请检查连接后重试。');
     } finally {
       setBusy(false);
       submitting.current = false;
@@ -186,6 +202,8 @@ export function ExamPage({
       </Page>
     );
   if (!attempt) return <Loading />;
+  const resultCourse=data.courses.find(c=>c.id===attempt.courseId&&c.version===attempt.version);
+  const quotaSpent=resultCourse?examEntry(resultCourse,data).exhausted:false;
   const answered = attempt.paper.questions.filter((q) =>
     (answers[q.id] || []).some(Boolean),
   ).length;
@@ -198,8 +216,10 @@ export function ExamPage({
         >
           {attempt.status === "pending_review" ? (
             <Clock3 size={42} />
-          ) : (
+          ) : attempt.passed ? (
             <CheckCircle2 size={42} />
+          ) : (
+            <CircleAlert size={42} />
           )}
           <span>
             {attempt.status === "pending_review"
@@ -209,13 +229,13 @@ export function ExamPage({
                 : "本次未合格"}
           </span>
           <b>
-            {attempt.score ?? 0}
-            <small>分</small>
+            {attempt.status === "pending_review" ? "待定" : attempt.score ?? "—"}
+            <small>{attempt.status === "pending_review" ? "最终成绩" : "分"}</small>
           </b>
           <p>
             {attempt.status === "pending_review"
-              ? "当前显示客观题得分，阅卷后更新最终成绩"
-              : "本次成绩已保存"}
+              ? `客观题已得 ${attempt.score ?? "—"} 分，主观题阅卷后公布最终成绩`
+              : !attempt.passed&&quotaSpent?"本版本考试次数已用完，可回顾答卷巩固知识":"本次成绩已保存"}
           </p>
         </div>
         <main className="page-gutter">
@@ -309,6 +329,7 @@ export function ExamPage({
         <small>{saveStatus}</small>
         <Progress value={(answered / attempt.paper.questions.length) * 100} />
       </div>
+      {left === 0 && <div className="page-gutter" role="status"><p className="notice">考试时间已结束，不能继续修改答案。{busy ? '正在提交已保存的答案。' : '请确认已保存的答案已成功提交。'}</p>{!busy && !locked && !error && <button className="primary-button" onClick={() => void submit(true)}>提交已保存的答案</button>}</div>}
       {error && (
         <div className="page-gutter">
           <ErrorState message={error} />
@@ -322,7 +343,7 @@ export function ExamPage({
                   ?.drain()
                   .catch(() => {})
                   .then(() => remote.retry());
-              } else if (left === 0) void submit(true);
+              } else if (left === 0 || submitFailed) void submit(left === 0);
               else void persist(latest.current).catch(() => {});
             }}
           >
@@ -330,7 +351,7 @@ export function ExamPage({
               ? "放弃本地更改并加载服务端答卷"
               : left === 0
                 ? "提交已保存的答案"
-                : "重试保存"}
+                : submitFailed ? "重试交卷" : "重试保存"}
           </button>
         </div>
       )}

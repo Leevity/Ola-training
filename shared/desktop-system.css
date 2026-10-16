@@ -128,6 +128,10 @@
   color: var(--brand);
   white-space: nowrap;
 }
+.rank-medal {display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.rank-medal.rank-2 {color:#70839c}
+.rank-medal.rank-3 {color:#a56b42}
+.evaluation-row > div > small {display:block;margin-top:5px}
 .report-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -397,3 +401,9 @@
 }
 .sidebar .brand strong {font-size:16px;letter-spacing:-.3px;white-space:nowrap}.sidebar .brand-symbol {flex-shrink:0;font-size:12px}.sidebar .brand {gap:8px;padding-inline:4px}@media (min-width:761px) and (max-width:1100px){.sidebar .brand strong{font-size:15px}.sidebar .brand-symbol{width:32px;height:32px}}
 .brand-symbol:has(> img), .login-brand > span:has(> img) {background:transparent;box-shadow:none}.brand-symbol > img, .login-brand > span > img {width:100%;height:100%;object-fit:contain}.ola-nav-icon {width:22px;height:22px;object-fit:contain;flex-shrink:0}.whale-banner > img {object-fit:contain}
+.workspace .course-grid:has(>.course-card:only-child){grid-template-columns:minmax(0,1fr)}
+.workspace .course-grid>.course-card:only-child{display:grid;grid-template-columns:minmax(180px,32%) minmax(0,1fr);align-items:stretch}
+.workspace .course-grid>.course-card:only-child .card-picture,.workspace .course-grid>.course-card:only-child .cover{height:100%;aspect-ratio:auto;min-height:180px}
+.workspace .course-grid>.course-card:only-child .course-card-body{align-self:center;padding:24px}
+.workspace .resume-panel>img{width:48%;height:calc(100% - 38px);max-width:none;right:0;bottom:38px;object-fit:cover;object-position:right;mask-image:linear-gradient(90deg,transparent,#000 32%);opacity:.45;pointer-events:none}
+.workspace .task-main p.task-activity-hint{color:var(--brand-strong);font-size:13px;line-height:1.6;margin-top:8px}

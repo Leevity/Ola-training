@@ -1,5 +1,8 @@
 import { ConfirmationDialog } from "./confirmation-dialog";
-import { useState } from "react";
+import { useEffect,useState } from "react";
+import {routeChoice,choiceRoute} from '../../shared/learner-navigation';
+import {keepListScroll} from '../../shared/learner-list-scroll';
+import {dateTime} from './domain';
 import { CheckCircle2, ChevronRight } from "lucide-react";
 import type { Course } from "@ola/learner-client/types";
 import { Page, Topbar, Empty, SectionTitle } from "./ui";
@@ -7,8 +10,9 @@ import { usePortal } from "./portal";
 import { Reviews } from "./pages";
 type Nav = { go: (path: string) => void; back: () => void };
 export function GrowthPage({ go, back }: Nav) {
-  const { data } = usePortal();
-  const [tab, setTab] = useState("ability"),
+  const { data,session } = usePortal();
+  useEffect(()=>keepListScroll(session.user.tenantId+':'+session.user.memberId),[]);
+  const [tab, setTab] = useState(()=>routeChoice(location.hash,'tab',['ability','reviews'],'ability')),
     [selected, setSelected] = useState<Course | null>(null);
   const evaluated = data.training.filter(
     (t) => ["completed", "failed"].includes(t.status) && t.score !== null,
@@ -27,13 +31,13 @@ export function GrowthPage({ go, back }: Nav) {
       <div className="detail-tabs">
         <button
           className={tab === "ability" ? "selected" : ""}
-          onClick={() => setTab("ability")}
+          onClick={() => {setTab('ability');go(choiceRoute(location.hash,{tab:'ability'}));}}
         >
           训练综合评价
         </button>
         <button
           className={tab === "reviews" ? "selected" : ""}
-          onClick={() => setTab("reviews")}
+          onClick={() => {setTab('reviews');go(choiceRoute(location.hash,{tab:'reviews'}));}}
         >
           课程评价
         </button>
@@ -66,6 +70,7 @@ export function GrowthPage({ go, back }: Nav) {
                     </span>
                     <span>
                       <strong>{t.title}</strong>
+                      <small>v{t.version} · {dateTime(t.createdAt)}</small>
                       <small>
                         {t.evaluation?.feedback || "查看评价与复盘"}
                       </small>

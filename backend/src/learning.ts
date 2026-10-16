@@ -7,6 +7,7 @@ import { bad, conflict, forbidden, missing, HttpError } from './errors.ts';
 import { id, progressInput } from './schemas.ts';
 import { iso, listTasks, mutate } from './store.ts';
 import { courseVisible } from './content-access.ts';
+import { sceneCompletion, type SceneState } from '../../shared/classroom.ts';
 export async function finished(tx:Queryable,a:Actor,courseId:string,version:number):Promise<boolean>{
  const v=(await tx.query('SELECT content FROM course_versions WHERE tenant_id=$1 AND course_id=$2 AND version=$3',[a.tenantId,courseId,version])).rows[0];if(!v)return false;
  if(v.content.kind==='learn'){const expected=v.content.lessons.map((l:any)=>l.id);const rows=(await tx.query('SELECT lesson_id FROM learning_progress WHERE tenant_id=$1 AND member_id=$2 AND course_id=$3 AND course_version=$4',[a.tenantId,a.memberId,courseId,version])).rows;return expected.length>0&&expected.every((lessonId:string)=>rows.some(r=>r.lesson_id===lessonId));}
@@ -67,6 +68,10 @@ export async function registerLearning(app:FastifyInstance,db:Database){
   await tx.query('SELECT id FROM members WHERE tenant_id=$1 AND id=$2 FOR UPDATE',[a.tenantId,a.memberId]);
   const course=await accessible(tx,a,input.courseId,input.version);if(course.kind!=='learn')throw bad('训练或考试完成须由评价或评分结果确认');if(!course.lessons.some((l:any)=>l.id===input.lessonId))throw bad('课时不属于该课程版本');
   const prior=(await tx.query('SELECT * FROM learning_progress WHERE tenant_id=$1 AND member_id=$2 AND event_id=$3',[a.tenantId,a.memberId,input.eventId])).rows[0];if(prior&&(prior.course_id!==input.courseId||prior.course_version!==input.version||prior.lesson_id!==input.lessonId))throw conflict('事件ID已用于其他进度记录');
+  const already=(await tx.query('SELECT 1 FROM learning_progress WHERE tenant_id=$1 AND member_id=$2 AND course_id=$3 AND course_version=$4 AND lesson_id=$5',[a.tenantId,a.memberId,input.courseId,input.version,input.lessonId])).rows.length>0;
+  if(!already){const lesson=course.lessons.find((item:any)=>item.id===input.lessonId);const scene=lesson?.format==='AI课堂'?course.classroom?.scenes.find((item:any)=>item.id===lesson.content):null;
+   if(scene&&['quiz','pbl'].includes(scene.type)){const runtime=(await tx.query('SELECT state FROM classroom_runtime WHERE tenant_id=$1 AND member_id=$2 AND course_id=$3 AND course_version=$4 AND scene_id=$5',[a.tenantId,a.memberId,input.courseId,input.version,scene.id])).rows[0];const completion=sceneCompletion(scene,(runtime?.state||{actionIndex:0,answers:{},submitted:false,notes:{}}) as SceneState);if(!completion.complete)throw bad(completion.hint);}
+  }
   await tx.query('INSERT INTO learning_progress(tenant_id,member_id,course_id,course_version,lesson_id,event_id) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',[a.tenantId,a.memberId,input.courseId,input.version,input.lessonId,input.eventId]);await updateAssignments(tx,a);return {ok:true,completed:await finished(tx,a,input.courseId,input.version)};
  });});
  app.post('/api/learn/exams/:id/attempts',async req=>{const a=req.actor!;const courseId=id.parse((req.params as any).id);const {version}=z.object({version:z.number().int().positive()}).parse(req.body);return db.transaction(async tx=>{

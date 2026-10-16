@@ -101,6 +101,8 @@ export interface SceneContentOptions {
   /** Original course request/profile, used by PBL v2 for explicit learner-level signals. */
   userRequirements?: UserRequirements;
   allowProceduralSkill?: boolean;
+  /** Disable CDN math injection for offline or network-isolated hosts. */
+  injectMathResources?: boolean;
   /**
    * Natural-language edit instruction for whole-slide regeneration (MAIC Editor
    * agent `regenerate_scene`). When set, the slide content prompt switches to
@@ -275,6 +277,7 @@ export async function generateSceneContent(
     // Route to widget generation (handles all 5 types)
     return generateWidgetContent(outline, aiCall, languageDirective, {
       allowProceduralSkill,
+      injectMathResources: options.injectMathResources,
       logger: log,
       onFailure: options.onFailure,
     });
@@ -1222,6 +1225,8 @@ export async function generateWidgetContent(
   languageDirective?: string,
   options: {
     allowProceduralSkill?: boolean;
+    /** Disable CDN math injection for offline or network-isolated hosts. */
+    injectMathResources?: boolean;
     logger?: GenerationLogger;
     onFailure?: (failure: SceneContentFailure) => void;
   } = {},
@@ -1364,7 +1369,7 @@ export async function generateWidgetContent(
   const widgetConfig = extractWidgetConfig(html, widgetType);
 
   return {
-    html: postProcessInteractiveHtml(html),
+    html: postProcessInteractiveHtml(html, { injectMathResources: options.injectMathResources }),
     widgetType,
     widgetConfig,
   };
