@@ -4,6 +4,27 @@ import {LearnerTransport} from '../../packages/learner-client/src/transport.ts';
 const user={id:'account-a',tenantId:'enterprise-a',memberId:'member-a'};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
 
+for(const [status,code,sameAccount] of [[401,'SESSION_EXPIRED',false],[403,'SESSION_CHANGED',false],[401,'SESSION_EXPIRED',true]])test(`旧会话迟到的${code}不清除已经更新的${sameAccount?'同账号':'新企业'}会话`,async()=>{
+ let release,expired=0;const gate=new Promise(resolve=>{release=resolve;});
+ const transport=new LearnerTransport({fetch:async()=>{await gate;return json({error:{code}},status);},onExpired:()=>expired++});
+ transport.setSession(user,'old');const pending=assert.rejects(transport.request('/learn/overview'),error=>error.code===code);
+ const next=sameAccount?user:{...user,tenantId:'enterprise-b',memberId:'member-b'};transport.setSession(next,'new');release();await pending;
+ assert.equal(expired,0);assert.equal(transport.csrf,'new');assert.equal(transport.context,`${next.id}:${next.tenantId}:${next.memberId}`);
+});
+
+for(const stage of ['refused','recovery-401','recovery-success'])test(`企业切换时旧CSRF恢复${stage}不重放写入、不覆盖新会话`,async()=>{
+ let release,expired=0,calls=0;const gate=new Promise(resolve=>{release=resolve;});
+ const transport=new LearnerTransport({fetch:async()=>{
+  calls++;
+  if(calls===1){if(stage==='refused')await gate;return json({error:{code:'CSRF_REFUSED'}},403);}
+  await gate;return stage==='recovery-401'?json({error:{code:'SESSION_EXPIRED'}},401):json({user,csrf:'stale-recovered'});
+ },onExpired:()=>expired++});
+ transport.setSession(user,'old');const pending=assert.rejects(transport.request('/learn/progress','POST',{}),error=>error.code==='SESSION_CHANGED');
+ if(stage!=='refused'){for(let attempt=0;calls<2&&attempt<20;attempt++)await new Promise(setImmediate);assert.equal(calls,2);}
+ const next={...user,tenantId:'enterprise-b',memberId:'member-b'};transport.setSession(next,'new');release();await pending;
+ assert.equal(expired,0);assert.equal(transport.csrf,'new');assert.equal(transport.context,'account-a:enterprise-b:member-b');assert.equal(calls,stage==='refused'?1:2);
+});
+
 test('网络中断显示可操作中文提示，不自动重放写入或清除有效身份',async()=>{
  let calls=0;const transport=new LearnerTransport({fetch:async()=>{calls++;throw new TypeError('Failed to fetch');},onExpired:()=>assert.fail()});transport.setSession(user,'csrf-a');
  await assert.rejects(transport.request('/learn/progress','POST',{eventId:'same'}),error=>error.code==='NETWORK_ERROR'&&error.status===0&&error.message.includes('请检查网络后重试'));
