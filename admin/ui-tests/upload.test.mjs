@@ -4,6 +4,20 @@ import {createRequire} from 'node:module';
 import React,{act} from 'react';
 const {JSDOM}=createRequire(new URL('../../packages/classroom-ui/package.json',import.meta.url))('jsdom');
 globalThis.React=React;
+test('知识上传已确认后列表失败：只读重试、不重复上传且锁定原文件',async()=>{
+ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});
+ Object.assign(globalThis,{window:dom.window,document:dom.window.document,HTMLElement:dom.window.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true});
+ const {UploadDialog}=await import('../src/upload-dialog.tsx');const {createRoot}=await import('react-dom/client');const root=createRoot(document.getElementById('root'));
+ let writes=0,reads=0,closes=0,release;const gate=new Promise(resolve=>{release=resolve;});
+ const button=name=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===name);
+ try{
+  await act(async()=>root.render(React.createElement(UploadDialog,{tenantId:'qa',onUpload:async()=>{writes++;return {ok:true};},onRefresh:async()=>{reads++;if(reads===1)throw new Error('模拟列表不可用');await gate;},onClose:()=>closes++})));
+  const input=document.querySelector('input[type="file"]');Object.defineProperty(input,'files',{value:[new dom.window.File(['# 虚构'],'刷新恢复.md')]});await act(async()=>input.dispatchEvent(new dom.window.Event('change',{bubbles:true})));
+  await act(async()=>button('保存文件').click());assert.equal(writes,1);assert.equal(reads,1);assert.equal(closes,0);assert.match(document.querySelector('[role="alert"]').textContent,/文件已保存.*无需再次上传/);assert.equal(input.disabled,true);assert.equal(document.querySelector('select').disabled,true);
+  const retry=button('重试刷新');await act(async()=>{retry.click();retry.click();});assert.equal(writes,1);assert.equal(reads,2);assert.equal(button('正在刷新…').disabled,true);
+  await act(async()=>release());assert.equal(writes,1);assert.equal(closes,1);assert.equal(document.querySelector('[role="alert"]'),null);
+ }finally{await act(async()=>root.unmount());dom.window.close();}
+});
 test('知识上传：等待锁定文件与分类、阻止关闭、失败保留并可重试',async()=>{
  const dom=new JSDOM('<button id="entry">上传</button><div id="root"></div>',{url:'http://localhost/'});
  Object.assign(globalThis,{window:dom.window,document:dom.window.document,HTMLElement:dom.window.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true});

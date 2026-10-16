@@ -26,7 +26,7 @@ export async function persistChange(before:Database,after:Database){
  if(tenants.length)await request(`${base()}/settings`,'PUT',tenants[0],headers);
  return bootstrap();
 }
-export async function uploadFile(file:File,category:string){const form=new FormData();form.append('category',category);form.append('file',file);await request(`${base()}/knowledge`,'POST',form,{'if-match':String(revision)});return bootstrap();}
+export async function uploadFile(file:File,category:string){const form=new FormData();form.append('category',category);form.append('file',file);await request(`${base()}/knowledge`,'POST',form,{'if-match':String(revision)});}
 export async function getFile(key:string):Promise<Blob>{const [scope,id]=key.split(':');if(scope!==tenantId||!id)throw new Error('文件企业范围不一致');return request<Blob>(`${base()}/knowledge/${encodeURIComponent(id)}/download`,'GET',undefined,{},true);}
 export const integrationStatus=()=>request<{configured:boolean;connected:boolean}>(`${base()}/integrations/openmaic/status`);
 export const localAuthoringStatus=()=>request<{configured:boolean;model:string|null}>(`${base()}/authoring/status`);
