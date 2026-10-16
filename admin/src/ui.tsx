@@ -107,7 +107,7 @@ export function Modal({
           ref.current?.querySelectorAll<HTMLElement>(
             'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],summary,[tabindex="0"]',
           ) || [],
-        ).filter((el) => !el.matches(':disabled') && el.getClientRects().length);
+        ).filter((el) => !el.matches(':disabled') && !el.closest('[inert]') && el.getClientRects().length);
         if (!nodes.length) {
           e.preventDefault();
           ref.current?.focus();

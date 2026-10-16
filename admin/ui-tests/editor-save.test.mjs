@@ -31,3 +31,23 @@ for(const kind of ['CourseEditor','TaskEditor','MemberEditor'])test(`${kind}: pe
   await click(kind==='MemberEditor'?'保存成员':'保存草稿');await act(async()=>resolve(true));assert.equal(calls,3);assert.equal(closes,1);
  }finally{await act(async()=>root.unmount());dom.window.close();}
 });
+
+// Keep the editor mounted while a confirmation is open; cancelling must retain draft state.
+test('CourseEditor: 未保存确认锁定编辑和提交，Escape继续且保存错误获得焦点',async()=>{
+ const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost/'});
+ Object.assign(globalThis,{window:dom.window,document:dom.window.document,HTMLElement:dom.window.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true});
+ const {createRoot}=await import('react-dom/client');const {CourseEditor}=await import('../src/editors.tsx');const root=createRoot(document.getElementById('root'));
+ const course={id:'new',tenantId:'demo',title:'原始标题',kind:'learn',category:'客户服务',summary:'说明',duration:20,cover:'/assets/course-prompting.webp',version:1,status:'draft',lessons:[],knowledgeIds:[]};
+ let saves=0,closes=0;
+ const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text||b.getAttribute('aria-label')===text);
+ const click=text=>act(async()=>button(text).click());
+ try{
+  await act(async()=>root.render(React.createElement(CourseEditor,{course,db:{courses:[],knowledge:[],members:[],tenants:[]},onSave:async()=>{saves++;throw new Error('测试保存失败');},onClose:()=>closes++})));
+  await act(async()=>{const input=document.querySelector('input');Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,'修改后的课程');input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
+  await click('关闭弹窗');assert.equal(closes,0);assert.equal(document.activeElement,button('继续编辑'));assert.equal(button('保存草稿'),undefined);assert.equal(document.querySelector('input').matches(':disabled'),true);assert.ok(document.querySelector('fieldset[inert]'));
+  await act(async()=>document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
+  assert.equal(button('继续编辑'),undefined);assert.equal(document.querySelector('input').value,'修改后的课程');assert.equal(document.querySelector('input').matches(':disabled'),false);
+  await click('保存草稿');assert.equal(saves,1);assert.equal(document.activeElement,document.querySelector('[role="alert"]'));assert.equal(document.querySelector('input').value,'修改后的课程');
+  await click('关闭弹窗');await click('放弃修改并关闭');assert.equal(closes,1);assert.equal(saves,1);
+ }finally{await act(async()=>root.unmount());dom.window.close();}
+});

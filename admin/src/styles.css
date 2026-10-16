@@ -160,3 +160,4 @@ th,.badge,.course-cell small,.account small,.breadcrumb,.tenant-select select {c
 .discard-confirmation {display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%}
 .discard-confirmation p {flex:1;min-width:220px;color:var(--muted);font-size:14px}
 .authoring-panel .error-message {font-size:14px;line-height:1.7}
+.editor-save-fields > .error-message {font-size:14px;line-height:1.7}
