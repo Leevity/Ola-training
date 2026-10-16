@@ -150,3 +150,4 @@ th,.badge,.course-cell small,.account small,.breadcrumb,.tenant-select select {c
 .audience-search { margin-top: 18px; }.audience-options label { min-height: 44px; }
 
 .audience-options { max-height: none; overflow: visible; gap: 4px; }
+.stats-row.scoped-stats {grid-template-columns:repeat(2,minmax(0,1fr))}

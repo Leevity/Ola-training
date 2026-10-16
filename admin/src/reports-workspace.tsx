@@ -9,11 +9,13 @@ export function ReportsWorkspace({
   tasks,
   audit,
   canReview,
+  canAudit = canReview,
   onRefresh,
 }: {
   tasks: Task[];
   audit: Audit[];
   canReview: boolean;
+  canAudit?: boolean;
   onRefresh: () => Promise<void>;
 }) {
   const [tab, setTab] = useState("tasks");
@@ -21,7 +23,7 @@ export function ReportsWorkspace({
   const tabs = [
     ["tasks", "任务完成明细"],
     ...(canReview ? [["reviews", "待评记录"]] : []),
-    ["audit", "管理操作记录"],
+    ...(canAudit ? [["audit", "管理操作记录"]] : []),
   ];
   return (
     <div className="reports-workspace">
@@ -81,7 +83,7 @@ export function ReportsWorkspace({
       {tab === "reviews" && canReview && (
         <ReviewPanel onDataRefresh={onRefresh} />
       )}
-      {tab === "audit" && (
+      {tab === "audit" && canAudit && (
         <section className="surface">
           <div className="section-heading">
             <div>

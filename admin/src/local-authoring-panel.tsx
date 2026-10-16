@@ -6,7 +6,7 @@ import { Field } from './ui';
 import * as api from './api';
 
 const stateLabels:Record<string,string>={queued_outline:'等待生成大纲',running_outline:'正在生成大纲',awaiting_outline:'待审阅大纲',queued_scenes:'等待生成场景',running_scenes:'正在生成场景',ready:'待应用课程草稿',paused:'已暂停',cancelled:'已取消',applied:'已应用草稿'};
-export function LocalAuthoringPanel({courses,knowledge,onDataChange,onBusyChange,onDirtyChange}:{courses:Course[];knowledge:Knowledge[];onDataChange:()=>Promise<void>;onBusyChange:(busy:boolean)=>void;onDirtyChange:(dirty:boolean)=>void}){
+export function LocalAuthoringPanel({courses,knowledge,onDataChange,onBusyChange,onDirtyChange,canConfigure}:{canConfigure:boolean;courses:Course[];knowledge:Knowledge[];onDataChange:()=>Promise<void>;onBusyChange:(busy:boolean)=>void;onDirtyChange:(dirty:boolean)=>void}){
  const [courseId,setCourseId]=useState(courses.find(c=>c.status==='draft'&&c.kind==='learn')?.id||'');
  const [requirement,setRequirement]=useState('');const [knowledgeIds,setKnowledgeIds]=useState<string[]>([]);
  const [showForm,setShowForm]=useState(true);
@@ -29,7 +29,7 @@ export function LocalAuthoringPanel({courses,knowledge,onDataChange,onBusyChange
  return <section aria-label="本地 AI 制课" className="authoring-panel">
   <div className="authoring-heading"><div><h3 className="subheading">资料制课</h3><p className="muted">选择资料、审阅大纲、生成课堂，最后应用到课程草稿。</p></div>{!showForm&&<button type="button" className="button" onClick={()=>setShowForm(true)}>新建制课任务</button>}</div>
   {error&&<div ref={errorRef} tabIndex={-1} role="alert" className="error-message">{error}</div>}{message&&<p role="status" className="notice">{message}</p>}
-  {configured===false&&<p className="notice">请先在“模型设置”保存并验证服务，再返回生成课堂。</p>}
+  {configured===false&&<p className="notice">{canConfigure?'请先在“模型设置”保存并验证服务，再返回生成课堂。':'模型服务尚未配置。请联系企业管理员完成配置，再返回生成课堂。'}</p>}
   {showForm&&<form onSubmit={e=>{e.preventDefault();void work(async()=>{const created=await api.startLocalAuthoring({courseId,requirement,knowledgeIds},key.current);key.current=randomId();await show(created.id);await onDataChange();await load();setMessage('制课任务已提交。可以关闭窗口，稍后回来查看进度。');});}}>
    <fieldset disabled={busy} style={{border:0,margin:0,padding:0}}>
     <Field label="目标学习课程草稿"><select required value={courseId} onChange={e=>{setCourseId(e.target.value);key.current=randomId();}}><option value="">请选择学习课程草稿</option>{courses.filter(c=>c.status==='draft'&&c.kind==='learn').map(c=><option value={c.id} key={c.id}>{c.title}</option>)}</select></Field>

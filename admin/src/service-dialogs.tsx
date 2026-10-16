@@ -6,7 +6,7 @@ import type { Course, Member, Knowledge } from './domain';
 import { Badge, Field, Modal } from './ui';
 import { AIProviderPanel } from './ai-provider-panel';
 import { LocalAuthoringPanel } from './local-authoring-panel';
-export function IntegrationDialog({courses,knowledge,onClose,onDataChange}:{courses:Course[];knowledge:Knowledge[];onClose:()=>void;onDataChange:()=>Promise<void>}){
+export function IntegrationDialog({courses,knowledge,onClose,onDataChange,canConfigure}:{canConfigure:boolean;courses:Course[];knowledge:Knowledge[];onClose:()=>void;onDataChange:()=>Promise<void>}){
  const [view,setView]=useState<'author'|'provider'|'bridge'>('author');
  const[status,setStatus]=useState<{configured:boolean;connected:boolean}|null>(null);const[jobs,setJobs]=useState<any[]>([]);const[error,setError]=useState('');const[busy,setBusy]=useState(false);const[courseId,setCourseId]=useState(courses.find(c=>c.status==='draft')?.id||'');const[requirement,setRequirement]=useState('');const[detail,setDetail]=useState<any>(null);const key=useRef(randomId());
  const[authorDirty,setAuthorDirty]=useState(false);
@@ -15,10 +15,10 @@ export function IntegrationDialog({courses,knowledge,onClose,onDataChange}:{cour
  useEffect(()=>{void load();},[]);
  return <Modal wide title="AI 课堂服务" description="从资料生成课堂草稿，审核后再发布给学员。" onClose={()=>!busy&&!providerBusy&&!authorBusy&&(!authorDirty||window.confirm('大纲有未保存的修改。放弃修改并关闭？'))&&onClose()} footer={<button className="button" disabled={busy||providerBusy||authorBusy} onClick={()=>void load()}><RefreshCw size={16}/>刷新连接与任务</button>}>
  <div className="ai-workspace-tabs" role="tablist" aria-label="AI 课堂服务视图">
-  {([['author','资料制课'],['provider','模型设置'],['bridge','兼容桥接']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={view===id} className={view===id?'active':''} onClick={()=>{if(view===id||busy||providerBusy||authorBusy)return;if(authorDirty&&!window.confirm('大纲有未保存的修改。放弃修改并切换视图？'))return;setView(id);}}>{label}</button>)}
+  {([['author','资料制课'],['provider','模型设置'],['bridge','兼容桥接']] as const).filter(([id])=>id!=='provider'||canConfigure).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={view===id} className={view===id?'active':''} onClick={()=>{if(view===id||busy||providerBusy||authorBusy)return;if(authorDirty&&!window.confirm('大纲有未保存的修改。放弃修改并切换视图？'))return;setView(id);}}>{label}</button>)}
  </div>
- {view==='author'&&<LocalAuthoringPanel courses={courses} knowledge={knowledge} onDataChange={onDataChange} onBusyChange={setAuthorBusy} onDirtyChange={setAuthorDirty}/>}
- {view==='provider'&&<AIProviderPanel onBusyChange={setProviderBusy}/>}
+ {view==='author'&&<LocalAuthoringPanel canConfigure={canConfigure} courses={courses} knowledge={knowledge} onDataChange={onDataChange} onBusyChange={setAuthorBusy} onDirtyChange={setAuthorDirty}/>}
+ {view==='provider'&&canConfigure&&<AIProviderPanel onBusyChange={setProviderBusy}/>}
  {view==='bridge'&&<section aria-label="独立 OpenMAIC 桥接服务"><h3 className="subheading">独立 OpenMAIC 桥接服务</h3>
  <div className="integration-status"><ShieldCheck size={24}/><div><strong>{status===null?'正在检查连接':status.connected?'OpenMAIC 已连接':status.configured?'已配置，服务暂不可达':'OpenMAIC 尚未配置'}</strong><p>{status?.connected?'生成请求由服务端签名，按企业关联任务。':'独立桥接使用上游服务自己的模型配置；本地资料制课使用上方配置。'}</p></div><Badge status={status?.connected?'ready':'pending'} label={status?.connected?'已连接':'待连接'}/></div>
  {error&&<div role="alert" className="error-message">{error}</div>}
