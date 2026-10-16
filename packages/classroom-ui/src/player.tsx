@@ -1,4 +1,4 @@
-import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { SlideCanvas } from '@openmaic/renderer';
 import {MediaFeedback,renderClassroomImage,renderClassroomAudio,renderClassroomVideo} from './media';
 import type { QuizQuestion } from '@openmaic/dsl';
@@ -26,6 +26,7 @@ function Quiz({questions,state,onChange,disabled}:{questions:QuizQuestion[];stat
  })}<div className="maic-toolbar"><button className="maic-primary" disabled={disabled||state.submitted||!ready} onClick={()=>onChange({...state,submitted:true})}>提交课内练习</button>{state.submitted&&<button disabled={disabled} onClick={()=>onChange({...state,submitted:false})}>重新练习</button>}<small>{ready?'课内练习用于复习，不计入正式考试成绩。':'请先完成所有题目再提交。'}</small></div></div>;
 }
 export function ScenePlayer({scene:source,state,onStateChange,disabled=false,assetClient='learner'}:{scene:unknown;state?:SceneState;onStateChange?:(state:SceneState)=>void;disabled?:boolean;assetClient?:'admin'|'learner'}){
+ const mediaFocus=useRef<HTMLDivElement>(null);
  const scene=useMemo(()=>cleanScene(source,assetClient),[source,assetClient]);const [local,setLocal]=useState<SceneState>(state||emptySceneState());const [reading,setReading]=useState(false);const [focusMode,setFocusMode]=useState(false);
  useEffect(()=>{if(state)setLocal(state);},[state]);
  useEffect(()=>()=>{if(typeof speechSynthesis!=='undefined')speechSynthesis.cancel();},[]);
@@ -36,7 +37,7 @@ export function ScenePlayer({scene:source,state,onStateChange,disabled=false,ass
  const readingText=scene.type==='slide'?slideReadingText(scene.content.canvas.elements):[];
  const speeches=actions.filter(a=>a.type==='speech');
  return <div className="maic-player">
-  <CanvasBoundary key={scene.id}>{scene.type==='slide'?<MediaFeedback key={scene.id}><div className="maic-canvas-scroll" role="region" aria-label="课件画面，可横向滚动" tabIndex={0}><div className="maic-canvas"><SlideCanvas slide={scene.content.canvas} effects={effects} canvasPercentage={98} videoInteractive renderImage={renderClassroomImage} renderAudio={renderClassroomAudio} renderVideo={renderClassroomVideo}/></div></div><p className="maic-canvas-hint">左右滑动课件，查看完整内容</p></MediaFeedback>:scene.type==='quiz'?<Quiz questions={scene.content.questions} state={local} onChange={change} disabled={disabled}/>:scene.type==='interactive'?<><Widget html={scene.content.html||''} title={scene.title}/><p className="maic-hint">互动操作仅在当前页面生效，重新打开会重置；课时完成不会按互动表现评分。若内容无法使用，请联系管理员。</p></>:<Project scene={scene} state={local} onChange={change} disabled={disabled}/>}</CanvasBoundary>
+  <CanvasBoundary key={scene.id}>{scene.type==='slide'?<MediaFeedback key={scene.id} focusTarget={mediaFocus}><div ref={mediaFocus} className="maic-canvas-scroll" role="region" aria-label="课件画面，可横向滚动" tabIndex={0}><div className="maic-canvas"><SlideCanvas slide={scene.content.canvas} effects={effects} canvasPercentage={98} videoInteractive renderImage={renderClassroomImage} renderAudio={renderClassroomAudio} renderVideo={renderClassroomVideo}/></div></div><p className="maic-canvas-hint">左右滑动课件，查看完整内容</p></MediaFeedback>:scene.type==='quiz'?<Quiz questions={scene.content.questions} state={local} onChange={change} disabled={disabled}/>:scene.type==='interactive'?<><Widget html={scene.content.html||''} title={scene.title}/><p className="maic-hint">互动操作仅在当前页面生效，重新打开会重置；课时完成不会按互动表现评分。若内容无法使用，请联系管理员。</p></>:<Project scene={scene} state={local} onChange={change} disabled={disabled}/>}</CanvasBoundary>
   {step&&<div className="maic-toolbar"><button disabled={disabled||step.previous===undefined} onClick={()=>{if(step.previous!==undefined)change({...local,actionIndex:step.previous});}}>上一段讲解</button><small>讲解 {step.number} / {step.total}</small><button disabled={disabled||step.next===undefined} onClick={()=>{if(step.next!==undefined)change({...local,actionIndex:step.next});}}>下一段讲解</button>
    {scene.type==='slide'&&actions.some(item=>item.type==='spotlight'||item.type==='laser')&&<button type="button" aria-pressed={focusMode} onClick={()=>setFocusMode(value=>!value)}>{focusMode?'查看完整课件':'聚焦讲解'}</button>}
    {typeof window!=='undefined'&&'speechSynthesis'in window&&<button disabled={disabled||!speeches.length} onClick={()=>{

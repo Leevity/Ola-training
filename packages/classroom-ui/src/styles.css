@@ -50,3 +50,6 @@
 
 .maic-editor-fieldset{border:0;padding:0;margin:0;min-width:0}.maic-editor[aria-busy="true"] .maic-editor-surface{pointer-events:none}
 .maic-media-errors .maic-error{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.maic-media-errors button{flex-shrink:0}.maic-player .maic-audio-button{position:absolute;left:50%;top:50%;width:44px;height:44px;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--brand);background:white;pointer-events:auto;line-height:1;font-size:18px}.maic-audio-button:focus-visible{outline:3px solid var(--brand);outline-offset:3px}
+.maic-media-errors button {min-height:44px;min-width:88px}
+.maic-canvas-scroll:focus-visible {outline:2px solid var(--brand,#246bfe);outline-offset:2px}
+.maic-audio-button[aria-disabled="true"] {opacity:.5;cursor:wait}
