@@ -1,0 +1,39 @@
+@import "katex/dist/katex.min.css";
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "../../../OpenMAIC/packages/@openmaic/renderer/dist";
+@source "../../../OpenMAIC/packages/@openmaic/editor/dist";
+@source "./";
+/* Deliberately omit Tailwind preflight; preserve the host product's existing CSS. */
+.maic-player, .maic-editor {color:var(--ink,#172238);font:14px/1.6 var(--font-family,sans-serif);min-width:0}
+.maic-canvas {position:relative;width:100%;aspect-ratio:16/9;min-height:220px;background:#edf1f6;overflow:hidden;border-radius:10px}
+.maic-canvas>* {width:100%;height:100%}
+.maic-toolbar {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+.maic-toolbar button,.maic-player button,.maic-editor-controls button {min-height:40px;padding:8px 14px;background:white;color:var(--ink);border:1px solid var(--line);border-radius:8px;font:inherit;cursor:pointer}
+.maic-toolbar button:disabled,.maic-player button:disabled {cursor:not-allowed;opacity:.5}
+.maic-player .maic-primary,.maic-editor-controls .maic-primary {background:var(--brand);border-color:var(--brand);color:white}
+.maic-toolbar small,.maic-hint {color:var(--muted)}
+.maic-transcript {padding:16px 0;border-top:1px solid var(--line);max-height:220px;overflow:auto}
+.maic-transcript p {margin:0 0 12px}.maic-transcript .current {color:var(--brand);font-weight:600}
+.maic-question {padding:18px 0;border-bottom:1px solid var(--line)}
+.maic-question label {display:flex;align-items:flex-start;gap:10px;margin:10px 0}
+.maic-question input[type=checkbox],.maic-question input[type=radio] {width:16px;min-width:16px;height:16px;min-height:16px;margin-top:5px;accent-color:var(--brand)}
+.maic-question textarea,.maic-editor .maic-field textarea,.maic-editor .maic-field input {width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;color:var(--ink);background:#fff}
+.maic-feedback {padding:12px;background:var(--brand-soft);border-radius:8px;margin-top:12px}
+.maic-widget {width:100%;height:560px;border:1px solid var(--line);border-radius:10px;background:white}
+.maic-editor-controls {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.maic-editor-surface {height:clamp(300px,48vh,560px);position:relative;isolation:isolate;background:#edf1f6;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.maic-scene-list {display:flex;gap:8px;overflow:auto;padding:12px 0;margin-bottom:12px}
+.maic-scene-list button {flex-shrink:0;min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:7px;background:white;color:var(--ink)}
+.maic-scene-list button.active {border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+.maic-editor .maic-field {display:block;margin:14px 0}.maic-editor .maic-field>span {display:block;margin-bottom:6px;color:var(--muted)}
+.maic-error {padding:12px;color:var(--danger,#c73838);background:#fff0f0;border-radius:8px;margin:12px 0}
+@media(max-width:600px){.maic-editor-surface {height:420px}.maic-widget {height:460px}.maic-canvas {min-height:180px}.maic-toolbar button {min-height:44px}.maic-transcript {max-height:180px}}
+
+.maic-editor .maic-canvas {height:clamp(260px,48vh,560px);aspect-ratio:auto}
+
+.maic-asset-picker{width:320px;max-width:calc(100vw - 64px);padding:12px;color:var(--ink);background:white}.maic-asset-picker p{font-size:12px;line-height:1.6}.maic-asset-picker input{display:block;max-width:100%;margin:10px 0}.maic-asset-library{max-height:240px;overflow:auto;display:grid;gap:8px}.maic-asset-library button{display:flex;gap:10px;align-items:center;text-align:left}.maic-asset-library img{width:64px;height:48px;object-fit:contain}.maic-asset-library span{overflow-wrap:anywhere}
+
+.maic-editor-fieldset{border:0;padding:0;margin:0;min-width:0}.maic-editor[aria-busy="true"] .maic-editor-surface{pointer-events:none}
+.maic-media-errors .maic-error{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.maic-media-errors button{flex-shrink:0}.maic-player .maic-audio-button{position:absolute;left:50%;top:50%;width:44px;height:44px;padding:0;border:1px solid var(--line);border-radius:50%;color:var(--brand);background:white;pointer-events:auto;line-height:1;font-size:18px}.maic-audio-button:focus-visible{outline:3px solid var(--brand);outline-offset:3px}

@@ -1,0 +1,399 @@
+/* Desktop adaptations of the original mobile design language. */
+.brand-symbol {
+  font-weight: 800;
+  font-size: 12px;
+  border-radius: 10px 10px 10px 2px;
+}
+.workspace-tabs {
+  display: flex;
+  gap: 28px;
+  border-bottom: 1px solid var(--line);
+  margin: 24px 0;
+}
+.workspace-tabs button {
+  min-height: 48px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.workspace-tabs button.selected {
+  border-bottom-color: var(--brand);
+  color: var(--brand);
+  font-weight: 700;
+}
+.soft-icon.green {
+  color: #209d72;
+  background: #e6f7ef;
+}
+.soft-icon.violet {
+  color: #756ce5;
+  background: #efedff;
+}
+.profile-progress {
+  padding: 20px 24px;
+  background: var(--brand-soft);
+  border: 1px solid #dce8fc;
+  border-radius: var(--radius);
+  margin-top: 16px;
+}
+.profile-progress > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.profile-progress b {
+  color: var(--brand);
+  font-size: 20px;
+}
+.profile-progress p {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.profile-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.profile-groups .section-head {
+  margin: 8px 0 16px;
+}
+.profile-groups .profile-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+.profile-groups .profile-menu > button {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 20px;
+  min-height: 92px;
+}
+.profile-groups .profile-menu > button:last-child {
+  border-bottom: 0;
+}
+.ability-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+.ability-summary strong {
+  font-size: 36px;
+  color: var(--brand);
+}
+.ability-summary strong small {
+  font-size: 14px;
+  color: var(--muted);
+}
+.ability-summary p {
+  color: var(--muted);
+}
+.evaluation-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin: 12px 0;
+}
+.evaluation-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.evaluation-row p {
+  color: var(--muted);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.evaluation-row > b {
+  color: var(--brand);
+  white-space: nowrap;
+}
+.report-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 24px 0;
+}
+.report-metrics > section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.metric-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-radius: 10px;
+}
+.report-metrics p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.report-metrics strong {
+  font-size: 30px;
+}
+.report-metrics small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 8px;
+}
+.reports-workspace > .surface {
+  margin-top: 0;
+}
+.reports-workspace .surface + .surface {
+  margin-top: 20px;
+}
+.editor-workspace-backdrop {
+  padding: 0;
+  background: var(--canvas);
+  display: block;
+}
+.modal.editor-workspace {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+}
+.editor-workspace > header,
+.editor-workspace > footer {
+  flex: none;
+  background: var(--surface);
+  padding: 20px max(28px, calc((100vw - 1280px) / 2));
+}
+.editor-workspace > .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 28px 40px;
+  background: var(--canvas);
+}
+.editor-workspace .editor-tabs {
+  position: sticky;
+  top: -24px;
+  background: var(--canvas);
+  z-index: 3;
+  padding-top: 8px;
+}
+.editor-workspace .form-grid,
+.editor-workspace .lesson-editor {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.editor-workspace .lesson-editor .form-grid {
+  border: 0;
+  padding: 0;
+}
+.editor-workspace .cover-preview {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.workspace .main-content {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 32px;
+}
+.main-shell > main {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 32px 32px 0;
+}
+.workspace .topbar,
+.main-shell .topbar {
+  min-height: 68px;
+  height: 68px;
+}
+.workspace .course-card {
+  border-radius: var(--radius);
+}
+.workspace .card-picture {
+  aspect-ratio: 16/9;
+  height: auto;
+}
+.workspace .card-picture img {
+  object-fit: contain;
+}
+.workspace .home-primary {
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr);
+  gap: 24px;
+}
+.workspace .resume-panel,
+.workspace .today-panel {
+  min-height: 300px;
+}
+.workspace .resume-copy {
+  padding: 28px 26px;
+  width: 78%;
+  position: relative;
+  z-index: 1;
+}
+.workspace .resume-copy h2 {
+  font-size: 24px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.workspace .resume-panel > img {
+  opacity: 0.5;
+  max-width: 220px;
+  right: -20px;
+}
+.workspace .resume-foot {
+  font-size: 12px;
+}
+.workspace .page-title h1,
+.main-shell .page-title h1 {
+  font-size: var(--page-title);
+}
+.workspace .section-head h2,
+.main-shell .section-heading h2 {
+  font-size: var(--section-title);
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .workspace .home-primary {
+    grid-template-columns: 1fr;
+  }
+  .workspace .today-panel {
+    min-height: 220px;
+  }
+  .profile-groups {
+    grid-template-columns: 1fr;
+  }
+  .app-shell > .sidebar,
+  .admin-shell > .sidebar {
+    width: 190px;
+    padding: 22px 12px;
+  }
+  .workspace,
+  .main-shell {
+    margin-left: 190px;
+  }
+  .sidebar .brand strong {
+    display: block;
+    font-size: 15px;
+  }
+  .admin-shell .brand > div {
+    display: block;
+  }
+  .admin-shell .brand small {
+    display: none;
+  }
+  .sidebar nav a,
+  .admin-shell .sidebar nav a {
+    font-size: 14px;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 0 12px;
+    min-height: 46px;
+  }
+  .sidebar nav a span,
+  .admin-shell .sidebar nav a span {
+    display: inline;
+  }
+  .sidebar nav a small {
+    display: none;
+  }
+  .workspace .main-content,
+  .main-shell > main {
+    padding: 24px;
+  }
+  .report-metrics {
+    gap: 12px;
+  }
+  .report-metrics > section {
+    padding: 18px 14px;
+    gap: 10px;
+  }
+  .report-metrics .metric-icon {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .report-metrics {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .report-metrics > section {
+    padding: 16px;
+  }
+  .report-metrics strong {
+    font-size: 24px;
+  }
+  .workspace-tabs {
+    gap: 20px;
+    overflow: auto;
+    white-space: nowrap;
+  }
+  .profile-groups {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .workspace .main-content,
+  .main-shell > main {
+    padding: 20px 16px;
+  }
+  .workspace .home-primary {
+    grid-template-columns: 1fr;
+  }
+  .editor-workspace > header,
+  .editor-workspace > footer {
+    padding: 16px;
+  }
+  .editor-workspace > .modal-body {
+    padding: 16px;
+  }
+  .editor-workspace .form-grid,
+  .editor-workspace .lesson-editor {
+    padding: 16px;
+  }
+  .editor-workspace > footer {
+    flex-wrap: wrap;
+  }
+  .editor-workspace .footer-note {
+    width: 100%;
+  }
+  .editor-workspace .editor-tabs {
+    top: -16px;
+  }
+}
+.sidebar .brand strong {font-size:16px;letter-spacing:-.3px;white-space:nowrap}.sidebar .brand-symbol {flex-shrink:0;font-size:12px}.sidebar .brand {gap:8px;padding-inline:4px}@media (min-width:761px) and (max-width:1100px){.sidebar .brand strong{font-size:15px}.sidebar .brand-symbol{width:32px;height:32px}}
+.brand-symbol:has(> img), .login-brand > span:has(> img) {background:transparent;box-shadow:none}.brand-symbol > img, .login-brand > span > img {width:100%;height:100%;object-fit:contain}.ola-nav-icon {width:22px;height:22px;object-fit:contain;flex-shrink:0}.whale-banner > img {object-fit:contain}

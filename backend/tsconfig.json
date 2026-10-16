@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/lib/server/identity": [
+        "../OpenMAIC/lib/server/identity/types.ts"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "tests",
+    "../shared",
+    "scripts"
+  ]
+}

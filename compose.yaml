@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ola_training
+      POSTGRES_USER: ola
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ola -d ola_training"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  backend:
+    build: {context: ., dockerfile: backend/Dockerfile}
+    environment:
+      DATABASE_URL: postgresql://ola:${POSTGRES_PASSWORD}@postgres:5432/ola_training
+      ADMIN_ORIGIN: ${ADMIN_ORIGIN:?Set HTTPS ADMIN_ORIGIN}
+      LEARNER_ORIGIN: ${LEARNER_ORIGIN:-}
+      MOBILE_ORIGIN: ${MOBILE_ORIGIN:-}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@ola.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Set initial admin password}
+      OPENMAIC_URL: ${OPENMAIC_URL:-}
+      OLA_BRIDGE_SECRET: ${OLA_BRIDGE_SECRET:-}
+      AI_CONFIG_ENCRYPTION_KEY: ${AI_CONFIG_ENCRYPTION_KEY:-}
+    volumes: ["knowledge-data:/app/backend/data"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: unless-stopped
+  admin:
+    build: {context: ., dockerfile: admin/Dockerfile}
+    ports: ["127.0.0.1:4180:80"]
+    depends_on: [backend]
+    restart: unless-stopped
+  learner:
+    build: {context: ., dockerfile: learner/Dockerfile}
+    ports: ["127.0.0.1:4181:80"]
+    depends_on: [backend]
+    restart: unless-stopped
+  mobile:
+    build: {context: ., dockerfile: frontend/Dockerfile}
+    ports: ["127.0.0.1:4173:80"]
+    depends_on: [backend]
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  knowledge-data:

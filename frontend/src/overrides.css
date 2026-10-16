@@ -1,0 +1,6 @@
+.submit-sheet>div:last-child{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:18px}.submit-sheet>div:last-child>button:first-child{border:0;border-radius:8px;background:#edf3fa;color:#5f7390}.result-hero.failed{background:linear-gradient(#fff1e8,#fff9f5);color:#c37a39}
+.sheet-empty{padding:20px 4px;color:#8696aa;text-align:center;font-size:13px}.history-session{max-width:100%;overflow:hidden;text-overflow:ellipsis}.whale-chat-feed{overscroll-behavior:contain}
+.sheet-copy{padding:10px 2px 16px;color:#62758f;font-size:14px;line-height:1.7}.my-rank{width:calc(100% - 32px);text-align:left;cursor:pointer}.rank-list>div{padding-right:6px}
+.rank-empty{display:grid;place-items:center;min-height:68px;margin:10px 16px;border:1px solid #e1eaf6;border-radius:14px;background:#fff;color:#788ba5;font-size:13px;text-align:center;padding:20px}
+
+.messages-page .topbar{grid-template-columns:48px 1fr 76px}.messages-page .topbar-action .text-action{white-space:nowrap;font-size:13px}

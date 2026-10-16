@@ -1,0 +1,47 @@
+{
+  "name": "ola-training-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist",
+    "migrations",
+    "package.json",
+    "README.md",
+    "AI_CONFIGURATION.md",
+    "LOCAL_BACKUP.md"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.mjs",
+    "build": "tsc --noEmit && node build.mjs",
+    "test": "tsx --test tests/backend.test.ts tests/local-backup.test.ts",
+    "data:local": "tsx scripts/local-backup.ts"
+  },
+  "dependencies": {
+    "@openmaic/dsl": "workspace:*",
+    "@openmaic/generation": "workspace:*",
+    "jszip": "^3.10.1",
+    "@xmldom/xmldom": "^0.9.9",
+    "pdfjs-dist": "4.8.69",
+    "@electric-sql/pglite": "0.3.16",
+    "@fastify/cookie": "^11.0.0",
+    "@fastify/helmet": "^13.0.0",
+    "@fastify/multipart": "^9.0.0",
+    "@fastify/rate-limit": "^10.0.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.6.0",
+    "pg": "^8.16.3",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.15.5",
+    "esbuild": "^0.27.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3"
+  }
+}

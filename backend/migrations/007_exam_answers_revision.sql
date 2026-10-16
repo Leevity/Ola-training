@@ -1,0 +1,2 @@
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS answers_revision INTEGER NOT NULL DEFAULT 0;
+INSERT INTO schema_migrations(version) VALUES(7) ON CONFLICT DO NOTHING;

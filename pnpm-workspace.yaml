@@ -1,0 +1,17 @@
+packages:
+  - backend
+  - admin
+  - learner
+  - frontend
+  - packages/*
+  - OpenMAIC/packages/@openmaic/dsl
+  - OpenMAIC/packages/@openmaic/generation
+  - OpenMAIC/packages/@openmaic/renderer
+  - OpenMAIC/packages/@openmaic/editor
+  - OpenMAIC/packages/@openmaic/storage
+onlyBuiltDependencies:
+  - esbuild
+  - '@tailwindcss/oxide'
+overrides:
+  react: 19.3.1
+  react-dom: 19.3.1

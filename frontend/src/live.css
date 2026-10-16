@@ -1,0 +1,464 @@
+.mobile-loading {
+  min-height: 220px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+.mobile-loading span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--brand);
+  animation: mobile-spin 0.8s linear infinite;
+}
+@keyframes mobile-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.mobile-error {
+  margin: 16px;
+  padding: 14px;
+  background: #fff0f0;
+  border-radius: 10px;
+  color: #b42323;
+  font-size: 14px;
+}
+.mobile-error button {
+  margin-top: 12px;
+}
+.mobile-toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(90vw, 390px);
+  background: #172238ee;
+  color: white;
+  padding: 12px 18px;
+  border-radius: 10px;
+  z-index: 1000;
+  font-size: 14px;
+}
+.mobile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 14px;
+}
+.mobile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mobile-form input,
+.mobile-form textarea,
+.mobile-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: white;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+.mobile-form textarea {
+  resize: vertical;
+}
+.mobile-form button {
+  align-self: flex-start;
+}
+.mobile-login {
+  padding: 52px 24px;
+  min-height: 100dvh;
+}
+.mobile-login .brand {
+  margin-bottom: 44px;
+}
+.mobile-login > h1 {
+  font-size: 25px;
+  margin-bottom: 12px;
+}
+.mobile-login > p {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+.mobile-login .mobile-form {
+  margin-bottom: 24px;
+}
+.mobile-login .mobile-form .primary-button {
+  width: 100%;
+}
+.mobile-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: white;
+}
+.mobile-tabs button {
+  min-height: 44px;
+  flex: 1;
+  border: 0;
+  border-radius: 8px;
+  background: #f4f6fa;
+  color: var(--muted);
+  font-size: 14px;
+}
+.mobile-tabs button.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 700;
+}
+.mobile-list-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 16px 12px;
+  min-height: 54px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  text-align: left;
+  font-size: 14px;
+}
+.mobile-list-row > span {
+  flex: 1;
+  min-width: 0;
+}
+.mobile-list-row strong {
+  display: block;
+  font-size: 14px;
+}
+.mobile-list-row small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.mobile-study {
+  padding: 16px 12px;
+}
+.mobile-study > h2 {
+  font-size: 19px;
+}
+.mobile-study video {
+  width: 100%;
+  max-height: 400px;
+  background: #172238;
+}
+.mobile-document p {
+  font-size: 15px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mobile-study .maic-feedback {
+  font-size: 12px;
+}
+.mobile-study .maic-toolbar {
+  gap: 6px;
+}
+.mobile-study .maic-toolbar button {
+  font-size: 13px;
+  padding: 8px 10px;
+  min-height: 44px;
+}
+.mobile-dialog {
+  background: white;
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 390px;
+}
+.mobile-dialog h2 {
+  font-size: 19px;
+}
+.mobile-dialog p {
+  font-size: 14px;
+  margin: 16px 0;
+}
+.mobile-dialog .primary-button {
+  color: white;
+  background: var(--brand);
+}
+
+.header-tools button {
+  width: 44px;
+  height: 44px;
+}
+.mobile-form input,
+.mobile-form textarea,
+.mobile-form select {
+  font-size: 16px;
+}
+
+.download-resource {
+  min-width: 0;
+}
+.download-resource button {
+  font: inherit;
+  cursor: pointer;
+}
+.download-resource button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.download-error {
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  margin: 8px 0;
+}
+.download-resource .resource-link {
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.source-card > .download-resource {
+  display: block;
+}
+.download-resource .download-error {
+  color: var(--danger);
+  display: block;
+  margin: 8px 0;
+}
+/* Native modal keeps keyboard and assistive technology in the confirmation. */
+.mobile-confirmation {
+  border: 1px solid var(--line);
+  width: calc(100% - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  color: var(--text);
+  margin: auto;
+  box-sizing: border-box;
+}
+.mobile-confirmation::backdrop {
+  background: #17223866;
+}
+
+/* Extensions to the original H5 components; keep the source page hierarchy. */
+.my-person .account-entry {
+  margin-left: auto;
+  color: var(--muted);
+}
+.account-settings {
+  padding-top: 16px;
+}
+.account-settings .light-hero {
+  padding: 16px 0;
+}
+.account-settings .my-overview {
+  margin-top: 24px;
+}
+.carousel-dots.normal button {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: #c6d4e8;
+  cursor: pointer;
+}
+.carousel-dots.normal button.active {
+  width: 18px;
+  background: var(--brand);
+}
+.whale-entry textarea {
+  font: inherit;
+  resize: vertical;
+}
+.whale-entry .primary-button:disabled {
+  opacity: 0.5;
+}
+.task-course-row:disabled {
+  opacity: 0.65;
+}
+.my-overview strong {
+  min-width: 0;
+}
+.my-overview span {
+  white-space: nowrap;
+}
+.sheet {
+  max-height: 85dvh;
+  overflow: auto;
+}
+.course-search input,
+.search-line input,
+.whale-entry textarea {
+  font-size: 16px;
+}
+.training-mode {
+  flex-wrap: wrap;
+}
+.training-mode button {
+  min-height: 36px;
+}
+.assistant-mobile-page {
+  height: 100dvh;
+  min-height: 0;
+  padding-bottom: calc(54px + env(safe-area-inset-bottom)) !important;
+  overflow: hidden;
+}
+.assistant-mobile-page .learner-assistant {
+  height: 100%;
+  min-height: 0;
+}
+.assistant-mobile-page .bottom-nav {
+  height: calc(54px + env(safe-area-inset-bottom));
+  padding-top: 3px;
+}
+.bottom-nav .nav-whale-avatar {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+}
+.rank-controls {
+  padding-top: 16px;
+}
+.rank-controls p {
+  margin-top: 8px;
+}
+.podium-trophy {
+  color: #e4aa2a;
+  margin-top: -16px;
+  margin-bottom: 4px;
+}
+.rating-form {
+  margin-top: 20px;
+}
+.training-expression .chat-person > small {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.training-system-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.training-message-time {
+  display: block;
+  margin-top: 5px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11px;
+}
+.training-composer textarea {
+  min-width: 0;
+  flex: 1;
+  resize: vertical;
+  max-height: 120px;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font: inherit;
+  font-size: 16px;
+}
+.training-composer .primary-button {
+  width: 44px;
+  padding: 0;
+}
+.training-expression .scene-panel {
+  max-height: 220px;
+  overflow: auto;
+}
+.training-expression .bubble {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.native-answer-options {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.native-answer-options label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 55px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 4px;
+  cursor: pointer;
+}
+.native-answer-options label > span {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: #f0f4f9;
+  color: #6782a7;
+  font-size: 12px;
+  font-weight: 700;
+}
+.native-answer-options label > strong {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+.native-answer-options input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand);
+}
+.native-answer-options label.selected > span {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+.native-answer-options textarea {
+  width: 100%;
+  min-height: 95px;
+  padding: 12px;
+  border: 1px solid #dce6f3;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+.result-hero.pending {
+  color: #315e9d;
+  background: linear-gradient(#e8f2ff, #f4f8ff);
+}
+.quiz-footer .primary-button {
+  min-height: 44px;
+}
+.topbar-action .text-action {
+  white-space: nowrap;
+  padding: 0;
+  font-size: 12px;
+  min-height: 44px;
+}
+.rating-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rating-picker button {
+  border: 0;
+  background: transparent;
+  color: #ffb530;
+  min-width: 36px;
+  min-height: 44px;
+  padding: 4px;
+}
+.rating-picker small {
+  color: var(--muted);
+}
+.brand-mark {font-size:12px;letter-spacing:-.5px;flex-shrink:0}.brand strong {font-size:20px;letter-spacing:-.4px;white-space:nowrap}
+.brand-mark:has(> img) {background:transparent;transform:none}.brand-mark > img {width:100%;height:100%;object-fit:contain}.ola-nav-icon {width:24px;height:24px;object-fit:contain}

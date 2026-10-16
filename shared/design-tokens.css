@@ -1,0 +1,33 @@
+/* Shared by admin, PC learner and embedded mobile H5. Keep product tokens here. */
+:root {
+  --brand: #246bfe;
+  --brand-strong: #1758d8;
+  --brand-soft: #eaf2ff;
+  --ink: #172238;
+  --muted: #5f6f86;
+  --faint: #63738a;
+  --canvas: #f4f6fa;
+  --line: #e5eaf1;
+  --surface: #ffffff;
+  --success: #16865b;
+  --warning: #a56109;
+  --danger: #c73838;
+  --radius: 12px;
+  --page-title: 25px;
+  --section-title: 19px;
+  --card-title: 16px;
+  --body: 14px;
+  --meta: 12px;
+  --tap: 44px;
+  --font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  /* Compatibility aliases for the existing PC learner styles. */
+  --blue: var(--brand);
+  --blue-press: var(--brand-strong);
+  --blue-soft: var(--brand-soft);
+  --text: var(--ink);
+  --light: var(--faint);
+}
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

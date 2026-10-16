@@ -1,0 +1,15 @@
+import { z } from 'zod';
+import { classroomSchema } from './maic-contract.ts';
+export const id=z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/);
+export const audienceSchema=z.object({mode:z.enum(['enterprise','departments','members']),departments:z.array(z.string().trim().min(1).max(80)).max(100).default([]),memberIds:z.array(id).max(10000).default([])});
+const text=(max=500)=>z.string().trim().max(max);
+const required=(max=80)=>text(max).min(1);
+export const courseInput=z.object({id:id.optional(),title:required(),summary:text(),kind:z.enum(['learn','train','exam']),category:required(),cover:text(2048).refine(v=>v.startsWith('/assets/')||/^https:\/\//.test(v),'封面地址不合法'),duration:z.number().int().min(1).max(9999),lessons:z.array(z.object({id,title:text(160),format:z.enum(['文档','视频链接','AI课堂']),content:text(200000)})).max(100),knowledgeIds:z.array(id).max(100),classroom:classroomSchema.optional(),audience:audienceSchema.default({mode:'enterprise',departments:[],memberIds:[]}),trainingMode:z.enum(['人机训练','跟读训练','演讲训练']),role:text(500),objective:text(10000),rubric:text(10000),examPass:z.number().int().min(1).max(100),examMinutes:z.number().int().min(1).max(1440),examAttempts:z.number().int().min(1).max(100)});
+export const taskInput=z.object({id:id.optional(),title:required(),description:text(2000),start:z.iso.date(),due:z.iso.date(),sequential:z.boolean(),courseIds:z.array(id).max(100),memberIds:z.array(id).max(10000)}).refine(t=>t.start<=t.due,'截止日期不能早于开始日期');
+export const memberInput=z.object({id:id.optional(),name:required(30),employeeNo:required(40),department:required(),role:z.enum(['学员','内容作者','部门管理员','企业管理员']),active:z.boolean()});
+export const tenantInput=z.object({name:required(100),shortName:required(30),description:text(2000),departments:z.array(required()).min(1).max(100)});
+export const accountInput=z.object({email:z.email().max(254).transform(v=>v.toLowerCase()),password:z.string().min(12).max(128)});
+export const loginInput=z.object({email:z.email().max(254).transform(v=>v.toLowerCase()),password:z.string().min(1).max(128)});
+export const questionInput=z.object({active:z.boolean().default(true),id:id.optional(),courseId:id,type:z.enum(['single','multiple','boolean','fill','text']),title:required(2000),options:z.array(z.object({id:required(16),text:required(2000)})).max(12),answers:z.array(required(10000)).min(1).max(12),explanation:text(10000),points:z.number().int().min(1).max(100)});
+export const progressInput=z.object({courseId:id,version:z.number().int().positive(),lessonId:id,eventId:id});
+export const generationInput=z.object({courseId:id,requirement:required(10000),language:z.enum(['zh-CN','en-US']).default('zh-CN')});

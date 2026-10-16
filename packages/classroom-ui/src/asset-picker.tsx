@@ -1,0 +1,17 @@
+import {useEffect,useRef,useState} from 'react';
+import type {EditorAsset,EditorAssetPickerRequest} from '@openmaic/editor/ui';
+export type CourseAsset=EditorAsset&{id?:string;name?:string;mime?:string};
+export type AssetServices={uploadAsset?:(file:File)=>Promise<CourseAsset>;listAssets?:()=>Promise<CourseAsset[]>;onBusyChange?:(busy:boolean)=>void;busy?:boolean};
+function matches(accept:string,mime:string){return accept.split(',').some(value=>value.trim().endsWith('/*')?mime.startsWith(value.trim().slice(0,-1)):mime===value.trim());}
+async function dimensions(file:File|string){
+ if(typeof file!=='string'&&!file.type.startsWith('image/'))return {};
+ const url=typeof file==='string'?file:URL.createObjectURL(file);try{return await new Promise<{width:number;height:number}>((resolve,reject)=>{const image=new Image(),timer=setTimeout(()=>reject(new Error('图片读取超时，请换一张图片。')),10000);image.onload=()=>{clearTimeout(timer);if(!image.naturalWidth||image.naturalWidth>12000||image.naturalHeight>12000||image.naturalWidth*image.naturalHeight>40000000)reject(new Error('图片尺寸过大，请压缩后上传。'));else resolve({width:image.naturalWidth,height:image.naturalHeight});};image.onerror=()=>{clearTimeout(timer);reject(new Error('图片无法读取，请检查文件格式。'));};image.src=url;});}finally{if(typeof file!=='string')URL.revokeObjectURL(url);}
+}
+export function AssetPicker({request,services}:{request:EditorAssetPickerRequest;services:AssetServices}){
+ const mounted=useRef(true);useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+ const[assets,setAssets]=useState<CourseAsset[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{let active=true;services.listAssets?.().then(items=>{if(active)setAssets(items);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[]);
+ useEffect(()=>{services.onBusyChange?.(busy);return()=>services.onBusyChange?.(false);},[busy,services.onBusyChange]);
+ const pick=async(asset:CourseAsset)=>{setBusy(true);setError('');try{const size=asset.mime?.startsWith('image/')?await dimensions(asset.src):{};if(mounted.current)await request.onPick({...asset,...size});}catch{setError('素材无法插入，请检查格式后重试。');}finally{setBusy(false);}};
+ return <div className="maic-asset-picker"><strong>课程素材</strong><p>保存到本企业课程，可在课件中重复使用。单文件不超过10MB。</p><label>上传{request.accept.startsWith('image')?'图片':request.accept.startsWith('audio')?'音频':'视频'}<input aria-label="上传课程素材" type="file" accept={request.accept} disabled={busy||!services.uploadAsset} onChange={async e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;setBusy(true);setError('');try{if(file.size>10*1024*1024)throw new Error('素材不能超过10MB。');if(!matches(request.accept,file.type)||!/^.+\.(png|jpe?g|gif|webp|mp3|wav|ogg|mp4|webm)$/i.test(file.name))throw new Error('请选择当前类型的图片、音频或视频文件。');const size=await dimensions(file);const asset=await services.uploadAsset!(file);if(!mounted.current)return;setAssets(items=>[asset,...items]);await request.onPick({...asset,...size});}catch(error){setError((error as Error).message);}finally{setBusy(false);}}}/></label>{busy&&<p role="status">正在处理素材…</p>}{error&&<p className="maic-error" role="alert">{error}</p>}<div className="maic-asset-library">{assets.filter(asset=>matches(request.accept,asset.mime||'')).map(asset=><button key={asset.id||asset.src} disabled={busy} onClick={()=>void pick(asset)}>{asset.mime?.startsWith('image/')&&<img src={asset.src} alt=""/>}<span>{asset.name||'课程素材'}</span></button>)}</div></div>;
+}

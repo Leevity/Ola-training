@@ -1,0 +1,37 @@
+{
+  "name": "@ola/classroom-ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/player.tsx",
+    "./editor": "./src/editor.tsx",
+    "./styles.css": "./src/styles.css",
+    "./session": "./src/session.tsx",
+    "./assistant": "./src/assistant.tsx",
+    "./assistant.css": "./src/assistant.css"
+  },
+  "dependencies": {
+    "@ola/learner-client": "workspace:*",
+    "@openmaic/dsl": "workspace:*",
+    "@openmaic/renderer": "workspace:*",
+    "@openmaic/editor": "workspace:*",
+    "dompurify": "^3.2.0",
+    "katex": "^0.16.33",
+    "motion": "^12.0.0",
+    "tailwindcss": "^4.1.0"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.21.0",
+    "jsdom": "^29.1.1"
+  },
+  "scripts": {
+    "test": "tsx --test test/*.test.mjs"
+  }
+}

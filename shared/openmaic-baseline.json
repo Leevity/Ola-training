@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/THU-MAIC/OpenMAIC",
+  "commit": "ecb940c136cc5b4ea56dc81b2505e64eff1dea29",
+  "applicationVersion": "1.2.0-rc.2",
+  "packages": { "dsl": "0.11.3", "generation": "0.3.20", "renderer": "0.1.14", "editor": "0.0.11", "storage": "0.37.3" },
+  "integration": "Local workspace source packages; Fastify owns enterprise identity, publication and progress.",
+  "preserveExistingChanges": true
+}

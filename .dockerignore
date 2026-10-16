@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.git
+**/.next
+**/data
+**/.env
+**/.env.local
+**/evidence
+**/coverage
+.deploy
