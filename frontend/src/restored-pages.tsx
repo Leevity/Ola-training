@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ConfirmationDialog } from './confirmation-dialog';
 import {routeChoice,choiceRoute} from '../../shared/learner-navigation';
 import {
   Bell,
@@ -832,14 +833,21 @@ export function MyPage({ go }: Nav) {
 export function AccountPage({ go, back }: Nav) {
   const { session, changeTenant, logout, notify, refresh } = usePortal();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(''), [confirmLogout, setConfirmLogout] = useState(false);
+  const pending = useRef(false);
   const run = async (work: () => Promise<unknown>) => {
-    if (busy) return;
+    if (pending.current) return false;
+    pending.current = true;
     setBusy(true);
+    setError('');
     try {
       await work();
+      return true;
     } catch (e) {
-      notify((e as Error).message);
+      setError(e instanceof Error ? e.message : '操作未完成，请重试。');
+      return false;
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   };
@@ -878,12 +886,22 @@ export function AccountPage({ go, back }: Nav) {
             <strong>刷新学习数据</strong>
             <ChevronRight size={16} />
           </button>
-          <button disabled={busy} onClick={() => void run(logout)}>
+          <button disabled={busy} onClick={() => {setError('');setConfirmLogout(true);}}>
             <strong>退出登录</strong>
             <ChevronRight size={16} />
           </button>
         </div>
+        {error&&!confirmLogout&&<div role="alert" className="mobile-error"><p>{error}</p><p>可检查连接后重新点击上方操作。</p></div>}
       </main>
+      {confirmLogout&&<ConfirmationDialog title="退出学习空间" onClose={()=>{if(!pending.current){setConfirmLogout(false);setError('');}}}>
+        <h2>确认退出登录？</h2>
+        <p>已保存的学习记录会保留。下次登录后可以继续学习。</p>
+        {error&&<div role="alert" className="mobile-error"><p>{error}</p></div>}
+        <div className="mobile-tabs">
+          <button disabled={busy} onClick={()=>{setConfirmLogout(false);setError('');}}>取消</button>
+          <button disabled={busy} className="primary-button" onClick={async()=>{if(await run(logout))setConfirmLogout(false);}}>{busy?'正在退出…':'退出登录'}</button>
+        </div>
+      </ConfirmationDialog>}
     </Page>
   );
 }
