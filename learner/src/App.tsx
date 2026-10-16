@@ -206,6 +206,16 @@ function Workspace({
     [confirmLogout, setConfirmLogout] = useState(false),
     [switching, setSwitching] = useState(false);
   const alive = useRef(true);
+  const mainRef = useRef<HTMLElement>(null), focusedRoute = useRef(route);
+  useEffect(() => {
+    if (focusedRoute.current === route) return;
+    focusedRoute.current = route;
+    const frame = requestAnimationFrame(() => {
+      if (!document.querySelector('[aria-modal="true"],dialog[open]'))
+        mainRef.current?.focus({preventScroll:true});
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [route]);
   const overviewRequest=useRef(0);
   useEffect(() => {
     alive.current = true;
@@ -424,7 +434,7 @@ function Workspace({
               </button>
             </div>
           </header>
-          <main className={'main-content ' + (detail ? 'detail-content' : '')} key={route}>
+          <main ref={mainRef} tabIndex={-1} aria-label="学习内容" className={'main-content ' + (detail ? 'detail-content' : '')} key={route}>
             {switching ? <Loading text="正在切换企业" /> : content()}
           </main>
           <footer className="app-footer">

@@ -4,7 +4,7 @@ import {
   prepareHistoryBack,
   watchHashRoute,
 } from "../../shared/navigation-guard";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -151,6 +151,7 @@ export function BottomNav({
         <button
           key={id}
           className={active === id ? "active" : ""}
+          aria-current={active === id ? "page" : undefined}
           onClick={() => go(`/${id}`)}
         >
           {id === "whale" ? (
@@ -175,8 +176,13 @@ export function Page({
   go: (route: string) => void;
   className?: string;
 }) {
+  const pageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!document.querySelector('[aria-modal="true"],dialog[open]'))
+      pageRef.current?.focus({preventScroll:true});
+  }, [tab]);
   return (
-    <div className={`page ${tab ? "has-nav" : ""} ${className}`}>
+    <div ref={pageRef} tabIndex={-1} role="region" aria-label={mainTabs.find(item=>item.id===tab)?.label||'页面内容'} className={`page ${tab ? "has-nav" : ""} ${className}`}>
       {children}
       {tab && <BottomNav active={tab} go={go} />}
     </div>
