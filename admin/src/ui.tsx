@@ -177,6 +177,10 @@ export function Pagination({
   size?: number;
 }) {
   const pages = Math.max(1, Math.ceil(total / size));
+  const visiblePages = pages <= 7
+    ? Array.from({ length: pages }, (_, index) => index + 1)
+    : [...new Set([1, pages, ...Array.from({ length: 3 }, (_, index) =>
+        Math.max(2, Math.min(page - 1, pages - 3)) + index)])].sort((a, b) => a - b);
   return (
     <div className="pagination">
       <span>
@@ -190,16 +194,20 @@ export function Pagination({
         >
           <ChevronLeft size={16} />
         </button>
-        {Array.from({ length: pages }, (_, i) => (
+        {visiblePages.flatMap((number, index) => [
+          ...(index > 0 && number - visiblePages[index - 1] > 1
+            ? [<span key={`gap-${number}`} className="pagination-gap" aria-hidden="true">…</span>]
+            : []),
           <button
-            key={i}
-            aria-current={page === i + 1 ? "page" : undefined}
-            className={page === i + 1 ? "selected" : ""}
-            onClick={() => onPage(i + 1)}
+            key={number}
+            aria-label={`第 ${number} 页`}
+            aria-current={page === number ? "page" : undefined}
+            className={page === number ? "selected" : ""}
+            onClick={() => onPage(number)}
           >
-            {i + 1}
-          </button>
-        ))}
+            {number}
+          </button>,
+        ])}
         <button
           aria-label="下一页"
           disabled={page >= pages}

@@ -95,6 +95,14 @@ td {font-size:13px}
 /* Shared desktop reading scale: 12px is reserved for secondary metadata. */
 .page-title p,.section-heading p,.dashboard-task-list p,.quick-actions>button small,.integration-note p,.course-preview-grid small,.list-summary,.empty p,.info-line,.modal>header p,.field,.field input,.field select,.field textarea,.notice {font-size:14px}
 .empty p {color:var(--muted)}
+.pagination {flex-wrap:wrap;gap:12px}
+.pagination>span {white-space:nowrap}
+.pagination>div {flex-wrap:wrap;align-items:center}
+.pagination-gap {padding:0 3px;color:var(--muted)}
+.course-cell {min-width:316px}
+.course-cell img {flex-shrink:0}
+.course-cell>div {width:230px;min-width:0}
+.course-cell .row-title {max-width:230px}
 .button,.text-button,.stat>div,.stat p,.dashboard-task-list strong,.quick-actions>button strong,.course-preview-grid strong,.row-title,.row-actions button,.member-cell strong {font-size:14px}
 table,th,td,.search-input input,.toolbar-right select,.pagination {font-size:13px}
 th,.badge,.course-cell small,.account small,.breadcrumb,.tenant-select select {color:#5f6f86}
