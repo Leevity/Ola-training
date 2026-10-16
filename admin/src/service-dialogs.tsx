@@ -1,3 +1,4 @@
+import {useDiscardConfirmation} from './discard-confirmation';
 import { randomId } from '../../shared/random-id.ts';
 import { useEffect, useRef, useState } from 'react';
 import { Building2, Loader2, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
@@ -7,15 +8,16 @@ import { Badge, Field, Modal } from './ui';
 import { AIProviderPanel } from './ai-provider-panel';
 import { LocalAuthoringPanel } from './local-authoring-panel';
 export function IntegrationDialog({courses,knowledge,onClose,onDataChange,canConfigure}:{canConfigure:boolean;courses:Course[];knowledge:Knowledge[];onClose:()=>void;onDataChange:()=>Promise<void>}){
+ const discard=useDiscardConfirmation();
  const [view,setView]=useState<'author'|'provider'|'bridge'>('author');
  const[status,setStatus]=useState<{configured:boolean;connected:boolean}|null>(null);const[jobs,setJobs]=useState<any[]>([]);const[error,setError]=useState('');const[busy,setBusy]=useState(false);const[courseId,setCourseId]=useState(courses.find(c=>c.status==='draft')?.id||'');const[requirement,setRequirement]=useState('');const[detail,setDetail]=useState<any>(null);const key=useRef(randomId());
  const[authorDirty,setAuthorDirty]=useState(false);
  const[providerBusy,setProviderBusy]=useState(false);const[authorBusy,setAuthorBusy]=useState(false);
  const load=async()=>{setError('');try{const[s,j]=await Promise.all([api.integrationStatus(),api.generationJobs()]);setStatus(s);setJobs(j.items);}catch(e){setError((e as Error).message);}};
  useEffect(()=>{void load();},[]);
- return <Modal wide title="AI 课堂服务" description="从资料生成课堂草稿，审核后再发布给学员。" onClose={()=>!busy&&!providerBusy&&!authorBusy&&(!authorDirty||window.confirm('大纲有未保存的修改。放弃修改并关闭？'))&&onClose()} footer={<button className="button" disabled={busy||providerBusy||authorBusy} onClick={()=>void load()}><RefreshCw size={16}/>刷新连接与任务</button>}>
- <div className="ai-workspace-tabs" role="tablist" aria-label="AI 课堂服务视图">
-  {([['author','资料制课'],['provider','模型设置'],['bridge','兼容桥接']] as const).filter(([id])=>id!=='provider'||canConfigure).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={view===id} className={view===id?'active':''} onClick={()=>{if(view===id||busy||providerBusy||authorBusy)return;if(authorDirty&&!window.confirm('大纲有未保存的修改。放弃修改并切换视图？'))return;setView(id);}}>{label}</button>)}
+ return <Modal wide title="AI 课堂服务" description="从资料生成课堂草稿，审核后再发布给学员。" closeDisabled={busy||providerBusy||authorBusy} onClose={()=>{if(busy||providerBusy||authorBusy)return;if(discard.pending){discard.cancel();return;}discard.request(authorDirty,onClose,'大纲有未保存的修改，关闭后将放弃。','放弃修改并关闭');}} footer={discard.confirmation||<button className="button" disabled={busy||providerBusy||authorBusy} onClick={()=>void load()}><RefreshCw size={16}/>刷新连接与任务</button>}>
+ <fieldset disabled={discard.pending} style={{border:0,padding:0,margin:0,minWidth:0}}><div className="ai-workspace-tabs" role="tablist" aria-label="AI 课堂服务视图">
+  {([['author','资料制课'],['provider','模型设置'],['bridge','兼容桥接']] as const).filter(([id])=>id!=='provider'||canConfigure).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={view===id} className={view===id?'active':''} onClick={()=>{if(view===id||busy||providerBusy||authorBusy)return;discard.request(authorDirty,()=>setView(id),'大纲有未保存的修改，切换视图后将放弃。','放弃修改并切换');}}>{label}</button>)}
  </div>
  {view==='author'&&<LocalAuthoringPanel canConfigure={canConfigure} courses={courses} knowledge={knowledge} onDataChange={onDataChange} onBusyChange={setAuthorBusy} onDirtyChange={setAuthorDirty}/>}
  {view==='provider'&&canConfigure&&<AIProviderPanel onBusyChange={setProviderBusy}/>}
@@ -25,7 +27,7 @@ export function IntegrationDialog({courses,knowledge,onClose,onDataChange,canCon
  <div className="form-grid"><Field label="结果关联课程"><select value={courseId} onChange={e=>{setCourseId(e.target.value);key.current=randomId();}}><option value="">请选择草稿课程</option>{courses.filter(c=>c.status==='draft').map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></Field><div className="notice">结果保留在生成任务中；不会直接修改已发布课程或自动发布给学员。</div><Field label="制课要求" wide><textarea rows={3} maxLength={10000} value={requirement} onChange={e=>setRequirement(e.target.value)} placeholder="描述主题、受众和学习目标"/></Field></div><button className="button primary" disabled={!status?.connected||busy||!courseId||!requirement.trim()} onClick={async()=>{setBusy(true);setError('');try{await api.startGeneration(courseId,requirement,key.current);await onDataChange();key.current=randomId();await load();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>{busy?<Loader2 className="spin" size={16}/>:<Sparkles size={16}/>}启动生成</button>
  <h3 className="subheading">本企业生成任务</h3>{jobs.length?jobs.map(j=><div className="ordered-row" key={j.id}><div style={{flex:1,minWidth:0}}><strong>{courses.find(c=>c.id===j.courseId)?.title||j.courseId}</strong><p className="muted" style={{fontSize:12}}>{j.state}{j.error?` · ${j.error}`:''}</p></div><button className="button" onClick={async()=>{try{setDetail(await api.refreshGeneration(j.id));await load();}catch(e){setError((e as Error).message);}}}>刷新状态</button></div>):<p className="muted info-line">尚无生成任务。</p>}
  {detail&&<div className="notice"><strong>当前状态：{detail.job.state}</strong><p>课堂ID：{detail.job.stageId||'尚未生成'}</p>{detail.run?.state==='awaiting_outline_confirmation'&&<button className="button" onClick={async()=>{try{await api.generationCommand(detail.job.id,'confirm-outline',detail.run.outline?.revision);setDetail(await api.refreshGeneration(detail.job.id));await load();}catch(e){setError((e as Error).message);}}}>确认大纲并继续</button>}{detail.run?.state==='paused'&&<button className="button" onClick={async()=>{try{await api.generationCommand(detail.job.id,'retry');setDetail(await api.refreshGeneration(detail.job.id));await load();}catch(e){setError((e as Error).message);}}}>重试暂停任务</button>}</div>}
- </section>}</Modal>;
+ </section>}</fieldset></Modal>;
 }
 export function AccountDialog({member,onClose,onSaved}:{member:Member;onClose:()=>void;onSaved:()=>Promise<void>}){
  const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[busy,setBusy]=useState(false);const[error,setError]=useState('');

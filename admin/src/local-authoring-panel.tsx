@@ -1,3 +1,4 @@
+import {useDiscardConfirmation} from './discard-confirmation';
 import { randomId } from '../../shared/random-id.ts';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, Sparkles } from 'lucide-react';
@@ -7,12 +8,13 @@ import * as api from './api';
 
 const stateLabels:Record<string,string>={queued_outline:'等待生成大纲',running_outline:'正在生成大纲',awaiting_outline:'待审阅大纲',queued_scenes:'等待生成场景',running_scenes:'正在生成场景',ready:'待应用课程草稿',paused:'已暂停',cancelled:'已取消',applied:'已应用草稿'};
 export function LocalAuthoringPanel({courses,knowledge,onDataChange,onBusyChange,onDirtyChange,canConfigure}:{canConfigure:boolean;courses:Course[];knowledge:Knowledge[];onDataChange:()=>Promise<void>;onBusyChange:(busy:boolean)=>void;onDirtyChange:(dirty:boolean)=>void}){
+ const discard=useDiscardConfirmation();
  const [courseId,setCourseId]=useState(courses.find(c=>c.status==='draft'&&c.kind==='learn')?.id||'');
  const [requirement,setRequirement]=useState('');const [knowledgeIds,setKnowledgeIds]=useState<string[]>([]);
  const [showForm,setShowForm]=useState(true);
  const [jobs,setJobs]=useState<any[]>([]);const [job,setJob]=useState<any>(null);const [outlines,setOutlines]=useState<any[]>([]);
  const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');
- const errorRef=useRef<HTMLDivElement>(null);
+ const panelRef=useRef<HTMLElement>(null),errorRef=useRef<HTMLDivElement>(null);
  useEffect(()=>{if(error)errorRef.current?.focus();},[error]);
  const [configured,setConfigured]=useState<boolean|null>(null);const key=useRef(randomId());
  const working=useRef(false);const requestSequence=useRef(0);const selected=useRef<string|null>(null);const active=useRef(true);const dirty=useRef(false);const outlineRevision=useRef(0);
@@ -21,16 +23,17 @@ export function LocalAuthoringPanel({courses,knowledge,onDataChange,onBusyChange
  useEffect(()=>{onBusyChange(busy);return()=>onBusyChange(false);},[busy,onBusyChange]);
  useEffect(()=>{onDirtyChange(dirty.current);});
  useEffect(()=>{const before=(event:BeforeUnloadEvent)=>{if(dirty.current){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',before);return()=>{window.removeEventListener('beforeunload',before);onDirtyChange(false);};},[onDirtyChange]);
- const work=async(action:()=>Promise<void>)=>{if(working.current)return;working.current=true;requestSequence.current++;setBusy(true);setError('');setMessage('');try{await action();}catch(e){setError((e as Error).message);}finally{working.current=false;setBusy(false);}};
- const show=async(id:string)=>{if(dirty.current&&!window.confirm('大纲有未保存的修改。放弃修改并加载任务？'))return;const sequence=++requestSequence.current;const detail=await api.localAuthoringJob(id);if(!active.current||sequence!==requestSequence.current)return;selected.current=id;dirty.current=false;setShowForm(false);setJob(detail);setOutlines(detail.outline);outlineRevision.current=detail.revision;};
+ const work=async(action:()=>Promise<void>)=>{if(working.current)return;working.current=true;panelRef.current?.focus();requestSequence.current++;setBusy(true);setError('');setMessage('');try{await action();}catch(e){setError((e as Error).message);}finally{working.current=false;setBusy(false);}};
+ const show=async(id:string)=>{const sequence=++requestSequence.current;const detail=await api.localAuthoringJob(id);if(!active.current||sequence!==requestSequence.current)return;selected.current=id;dirty.current=false;setShowForm(false);setJob(detail);setOutlines(detail.outline);outlineRevision.current=detail.revision;};
  const command=async(action:'confirm'|'retry'|'cancel'|'apply')=>work(async()=>{
-  if(dirty.current&&action==='cancel'&&!window.confirm('大纲有未保存的修改。放弃修改并取消任务？'))return;requestSequence.current++;const course=courses.find(c=>c.id===job.courseId);const next=await api.localAuthoringCommand(job.id,job.revision,action,action==='apply'?course?.updatedAt:undefined);setJob(next);dirty.current=false;setOutlines(next.outline);await onDataChange();await load();setMessage(action==='apply'?'课堂已应用到课程草稿。请继续编辑并预览，确认后发布。':'操作已保存。');
+  requestSequence.current++;const course=courses.find(c=>c.id===job.courseId);const next=await api.localAuthoringCommand(job.id,job.revision,action,action==='apply'?course?.updatedAt:undefined);setJob(next);dirty.current=false;setOutlines(next.outline);await onDataChange();await load();setMessage(action==='apply'?'课堂已应用到课程草稿。请继续编辑并预览，确认后发布。':'操作已保存。');
  });
- return <section aria-label="本地 AI 制课" className="authoring-panel">
-  <div className="authoring-heading"><div><h3 className="subheading">资料制课</h3><p className="muted">选择资料、审阅大纲、生成课堂，最后应用到课程草稿。</p></div>{!showForm&&<button type="button" className="button" onClick={()=>setShowForm(true)}>新建制课任务</button>}</div>
+ const create=()=>void work(async()=>{const created=await api.startLocalAuthoring({courseId,requirement,knowledgeIds},key.current);key.current=randomId();await show(created.id);await onDataChange();await load();setMessage('制课任务已提交。可以关闭窗口，稍后回来查看进度。');});
+ return <section ref={panelRef} tabIndex={-1} aria-label="本地 AI 制课" className="authoring-panel">
+  {discard.confirmation&&<div className="notice">{discard.confirmation}</div>}<fieldset disabled={discard.pending} style={{border:0,padding:0,margin:0,minWidth:0}}><div className="authoring-heading"><div><h3 className="subheading">资料制课</h3><p className="muted">选择资料、审阅大纲、生成课堂，最后应用到课程草稿。</p></div>{!showForm&&<button type="button" className="button" disabled={busy} onClick={()=>discard.request(dirty.current,()=>{dirty.current=false;setOutlines(job.outline);setShowForm(true);},'当前大纲有未保存的修改，新建制课任务前将放弃。','放弃修改并新建')}>新建制课任务</button>}</div>
   {error&&<div ref={errorRef} tabIndex={-1} role="alert" className="error-message">{error}</div>}{message&&<p role="status" className="notice">{message}</p>}
   {configured===false&&<p className="notice">{canConfigure?'请先在“模型设置”保存并验证服务，再返回生成课堂。':'模型服务尚未配置。请联系企业管理员完成配置，再返回生成课堂。'}</p>}
-  {showForm&&<form onSubmit={e=>{e.preventDefault();void work(async()=>{const created=await api.startLocalAuthoring({courseId,requirement,knowledgeIds},key.current);key.current=randomId();await show(created.id);await onDataChange();await load();setMessage('制课任务已提交。可以关闭窗口，稍后回来查看进度。');});}}>
+  {showForm&&<form onSubmit={e=>{e.preventDefault();discard.request(dirty.current,create,'大纲有未保存的修改，生成新任务后将放弃。','放弃修改并生成新任务');}}>
    <fieldset disabled={busy} style={{border:0,margin:0,padding:0}}>
     <Field label="目标学习课程草稿"><select required value={courseId} onChange={e=>{setCourseId(e.target.value);key.current=randomId();}}><option value="">请选择学习课程草稿</option>{courses.filter(c=>c.status==='draft'&&c.kind==='learn').map(c=><option value={c.id} key={c.id}>{c.title}</option>)}</select></Field>
     {!courses.some(c=>c.status==='draft'&&c.kind==='learn')&&<p className="notice">当前没有学习课程草稿。请先前往“课程管理”新建草稿，再回到这里生成课堂。</p>}
@@ -46,7 +49,7 @@ export function LocalAuthoringPanel({courses,knowledge,onDataChange,onBusyChange
    </fieldset>
   </form>}
   <h3 className="subheading">制课任务</h3>
-  {!jobs.length?<p className="muted info-line">尚无本地制课任务。</p>:jobs.map(item=><div className="ordered-row" key={item.id}><div style={{flex:1,minWidth:0}}><strong>{courses.find(c=>c.id===item.courseId)?.title||item.courseId}</strong><p className="muted">{stateLabels[item.state]||item.state}{item.totalScenes?` · ${item.completedScenes}/${item.totalScenes} 个场景`:''}</p><small className="muted">创建于 {new Date(item.createdAt).toLocaleString('zh-CN')}</small></div><button className="button" aria-label={`查看${courses.find(c=>c.id===item.courseId)?.title||'制课任务'}，${new Date(item.createdAt).toLocaleString('zh-CN')}`} disabled={busy} onClick={()=>void work(()=>show(item.id))}>查看</button></div>)}
+  {!jobs.length?<p className="muted info-line">尚无本地制课任务。</p>:jobs.map(item=><div className="ordered-row" key={item.id}><div style={{flex:1,minWidth:0}}><strong>{courses.find(c=>c.id===item.courseId)?.title||item.courseId}</strong><p className="muted">{stateLabels[item.state]||item.state}{item.totalScenes?` · ${item.completedScenes}/${item.totalScenes} 个场景`:''}</p><small className="muted">创建于 {new Date(item.createdAt).toLocaleString('zh-CN')}</small></div><button className="button" aria-label={`查看${courses.find(c=>c.id===item.courseId)?.title||'制课任务'}，${new Date(item.createdAt).toLocaleString('zh-CN')}`} disabled={busy} onClick={()=>discard.request(dirty.current,()=>void work(()=>show(item.id)),'大纲有未保存的修改，加载其他任务后将放弃。','放弃修改并加载')}>查看</button></div>)}
   {job&&<section className="notice" aria-label="制课任务详情"><h3>{stateLabels[job.state]||job.state} · {job.courseTitle||'课堂'}</h3><p className="muted">模型：{job.model} · 已保存 {job.completedScenes}/{job.totalScenes} 个场景</p>{job.error&&<p role="alert" className="error-message">{job.error}</p>}
    {['awaiting_outline','paused'].includes(job.state)&&outlines.length>0&&<>
     <p>{job.state==='paused'?'当前步骤未完成。可修改未生成的场景类型或内容，保存后继续生成；已生成场景会保留。':'编辑每个场景的标题、说明和知识点；保存后再确认生成。'}{dirty.current&&<strong role="status"> 当前大纲有未保存修改。</strong>}</p>
@@ -62,8 +65,8 @@ export function LocalAuthoringPanel({courses,knowledge,onDataChange,onBusyChange
    </>}
    {job.state==='paused'&&<button className="button primary" disabled={busy||dirty.current} onClick={()=>void command('retry')}>{dirty.current?'请先保存修改':'保留已完成内容并重试'}</button>}
    {job.state==='ready'&&<><p>应用会替换目标草稿的课堂内容和课时。发布后的课程不受影响。</p><button className="button primary" disabled={busy} onClick={()=>void command('apply')}>应用到课程草稿</button></>}
-   {!['ready','applied','cancelled'].includes(job.state)&&<button className="button" style={{marginLeft:10}} disabled={busy} onClick={()=>void command('cancel')}>取消任务</button>}
+   {!['ready','applied','cancelled'].includes(job.state)&&<button className="button" style={{marginLeft:10}} disabled={busy} onClick={()=>discard.request(dirty.current,()=>void command('cancel'),'大纲有未保存的修改，取消任务后将放弃。','放弃修改并取消任务')}>取消任务</button>}
    {job.events?.length>0&&<details style={{marginTop:16}}><summary>任务记录</summary>{job.events.map((item:any)=><p className="muted" key={item.id}>{item.detail}</p>)}</details>}
   </section>}
- </section>;
+ </fieldset></section>;
 }

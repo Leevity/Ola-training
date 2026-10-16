@@ -157,3 +157,6 @@ th,.badge,.course-cell small,.account small,.breadcrumb,.tenant-select select {c
 .reports-workspace .error-message,.reports-workspace .error-message p {font-size:14px;line-height:1.7}
 .reports-workspace .notice {color:var(--muted)}
 .reports-workspace .table-scroll:focus-visible {outline:2px solid var(--brand);outline-offset:3px}
+.discard-confirmation {display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%}
+.discard-confirmation p {flex:1;min-width:220px;color:var(--muted);font-size:14px}
+.authoring-panel .error-message {font-size:14px;line-height:1.7}
