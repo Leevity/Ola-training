@@ -8,6 +8,7 @@
     "./editor": "./src/editor.tsx",
     "./styles.css": "./src/styles.css",
     "./session": "./src/session.tsx",
+    "./loading": "./src/loading.tsx",
     "./assistant": "./src/assistant.tsx",
     "./assistant.css": "./src/assistant.css"
   },

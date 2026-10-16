@@ -1,4 +1,5 @@
 import { randomId } from '../../shared/random-id.ts';
+import { ClassroomLoading } from '@ola/classroom-ui/loading';
 import { protectUnsaved } from "../../shared/navigation-guard";
 import { KnowledgeDownload } from "./knowledge-download";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -121,7 +122,7 @@ export function StudyPage({
         ) : (
           <section className="document-card mobile-study">
             {l.format === "AI课堂" ? (
-              <Suspense fallback={<Loading />}>
+              <Suspense fallback={<ClassroomLoading />}>
                 <ClassroomSession
                   key={l.id}
                   courseId={c.id}

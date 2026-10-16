@@ -8,6 +8,7 @@
 /* Deliberately omit Tailwind preflight; preserve the host product's existing CSS. */
 .maic-player, .maic-editor {color:var(--ink,#172238);font:14px/1.6 var(--font-family,sans-serif);min-width:0}
 .maic-player {container-type:inline-size;container-name:classroom-player}
+.maic-session-placeholder {min-height:640px;display:grid;place-items:center;padding:24px;color:var(--muted,#5f6f86);font:14px/1.6 var(--font-family,sans-serif);text-align:center}
 .maic-canvas {position:relative;width:100%;aspect-ratio:16/9;min-height:220px;background:#edf1f6;overflow:hidden;border-radius:10px}
 .maic-canvas-scroll {width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
 .maic-canvas-hint {display:none}

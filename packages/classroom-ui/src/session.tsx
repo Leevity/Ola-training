@@ -4,13 +4,7 @@ import { ScenePlayer, type SceneState } from "./player";
 import * as api from "@ola/learner-client";
 import { SceneWriter } from "./scene-writer";
 import { sceneCompletion } from '../../../shared/classroom.ts';
-function Loading() {
-  return (
-    <p role="status" className="maic-hint">
-      正在加载课堂记录…
-    </p>
-  );
-}
+import {ClassroomLoading as Loading} from './loading';
 export function ClassroomSession({
   courseId,
   version,

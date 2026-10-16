@@ -1,4 +1,5 @@
 import { randomId } from '../../shared/random-id.ts';
+import { ClassroomLoading } from '@ola/classroom-ui/loading';
 import {returnDestination} from '../../shared/learner-navigation';
 import {registerLeaveGuard,protectUnsaved} from '../../shared/navigation-guard';
 import { lazy, Suspense } from 'react';
@@ -195,7 +196,7 @@ export function StudyPage({ id, version }: { id: string; version: number }) {
               </div>
             </div>
           ) : lesson.format === 'AI课堂' ? (
-            <Suspense fallback={<Loading/>}><ClassroomLesson key={lesson.id} courseId={c.id} version={v} sceneId={lesson.content} scene={c.classroom?.scenes.find((scene:any)=>scene.id===lesson.content)} onReadyChange={setClassroomReady} onCompletionChange={(complete,hint)=>{setActivityComplete(complete);setActivityHint(hint);}}/></Suspense>
+            <Suspense fallback={<ClassroomLoading/>}><ClassroomLesson key={lesson.id} courseId={c.id} version={v} sceneId={lesson.content} scene={c.classroom?.scenes.find((scene:any)=>scene.id===lesson.content)} onReadyChange={setClassroomReady} onCompletionChange={(complete,hint)=>{setActivityComplete(complete);setActivityHint(hint);}}/></Suspense>
           ) : lesson.format === '视频链接' ? (
             <div className="video-content">
               {safeVideo(lesson.content) ? (
