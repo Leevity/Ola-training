@@ -51,10 +51,12 @@ function readRoute() {
   return location.hash.slice(1) || '/home';
 }
 export default function App() {
+  const sessionChanging = useRef(false);
   const [session, setSession] = useState<{ user: User; tenants: Tenant[] } | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState('');
   const load = async () => {
+    sessionChanging.current = true;
     setLoading(true);
     setError('');
     try {
@@ -63,6 +65,27 @@ export default function App() {
       if (!(e instanceof api.ApiError) || e.status !== 401) setError((e as Error).message);
       setSession(null);
     } finally {
+      sessionChanging.current = false;
+      setLoading(false);
+    }
+  };
+  const switchTenant = async (tenantId: string) => {
+    if (!session || sessionChanging.current || !allowLeaving()) return;
+    sessionChanging.current = true;
+    setLoading(true);
+    setError('');
+    let switched = false;
+    try {
+      await api.request('/auth/switch-tenant', 'POST', { tenantId });
+      switched = true;
+      setSession(await api.me());
+      location.hash = '/home';
+    } catch (e) {
+      const tenantName = session.tenants.find(t=>t.id===(switched?tenantId:session.user.tenantId))?.shortName || '当前企业';
+      const message = e instanceof Error ? e.message : '服务暂时不可用，请重试。';
+      setError(switched ? `已切换到${tenantName}，但连接失败，请重试。${message}` : `未能确认企业切换结果，上次确认的企业为${tenantName}。请重试连接。${message}`);
+    } finally {
+      sessionChanging.current = false;
       setLoading(false);
     }
   };
@@ -89,7 +112,7 @@ export default function App() {
     <Workspace
       key={session.user.tenantId + session.user.id}
       session={session}
-      reloadSession={load}
+      switchTenant={switchTenant}
       onLogout={() => setSession(null)}
     />
   );
@@ -189,11 +212,11 @@ function Login({ onLogin }: { onLogin: () => Promise<void> }) {
 }
 function Workspace({
   session,
-  reloadSession,
+  switchTenant,
   onLogout,
 }: {
   session: { user: User; tenants: Tenant[] };
-  reloadSession: () => Promise<void>;
+  switchTenant: (tenantId: string) => Promise<void>;
   onLogout: () => void;
 }) {
   const [data, setData] = useState<Overview | null>(null),
@@ -203,8 +226,7 @@ function Workspace({
     [search, setSearch] = useState(''),
     [refreshing, setRefreshing] = useState(false),
     [help, setHelp] = useState(false),
-    [confirmLogout, setConfirmLogout] = useState(false),
-    [switching, setSwitching] = useState(false);
+    [confirmLogout, setConfirmLogout] = useState(false);
   const alive = useRef(true);
   const mainRef = useRef<HTMLElement>(null), focusedRoute = useRef(route);
   useEffect(() => {
@@ -391,16 +413,7 @@ function Workspace({
               <select
                 aria-label="切换企业"
                 value={session.user.tenantId}
-                disabled={switching}
-                onChange={async (e) => {
-                  if(!allowLeaving())return;
-                  setSwitching(true);
-                  const result = await run(() =>
-                    api.request('/auth/switch-tenant', 'POST', { tenantId: e.target.value }),
-                  );
-                  if (result !== undefined) await reloadSession();
-                  else setSwitching(false);
-                }}
+                onChange={e => void switchTenant(e.target.value)}
               >
                 {session.tenants.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -435,7 +448,7 @@ function Workspace({
             </div>
           </header>
           <main ref={mainRef} tabIndex={-1} aria-label="学习内容" className={'main-content ' + (detail ? 'detail-content' : '')} key={route}>
-            {switching ? <Loading text="正在切换企业" /> : content()}
+            {content()}
           </main>
           <footer className="app-footer">
             <span>{tenant?.name}</span>

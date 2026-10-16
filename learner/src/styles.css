@@ -2841,6 +2841,10 @@ img {
   align-items: center;
   justify-content: center;
 }
+.error-state p {
+  color: var(--muted);
+  font-size: var(--body);
+}
 .modal-backdrop {
   position: fixed;
   inset: 0;
