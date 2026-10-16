@@ -151,3 +151,9 @@ th,.badge,.course-cell small,.account small,.breadcrumb,.tenant-select select {c
 
 .audience-options { max-height: none; overflow: visible; gap: 4px; }
 .stats-row.scoped-stats {grid-template-columns:repeat(2,minmax(0,1fr))}
+.report-recovery .empty {padding:24px 16px}
+.reports-workspace .pagination button {color:var(--muted);min-height:44px;min-width:72px;padding:0 12px;font-size:14px}
+.reports-workspace > .surface > .field {margin-bottom:16px}
+.reports-workspace .error-message,.reports-workspace .error-message p {font-size:14px;line-height:1.7}
+.reports-workspace .notice {color:var(--muted)}
+.reports-workspace .table-scroll:focus-visible {outline:2px solid var(--brand);outline-offset:3px}

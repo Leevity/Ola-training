@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { downloadBlob } from "./storage";
 import { RefreshCw, ArrowDownToLine } from "lucide-react";
 import type { Task } from "./domain";
@@ -12,8 +12,14 @@ export function TaskReportPanel({
   onDataRefresh?: () => Promise<void>;
 }) {
   const [exporting, setExporting] = useState(false);
+  const exportingRef = useRef(false), syncingRef = useRef(false);
+  const panelRef = useRef<HTMLElement>(null);
+  const [exportError, setExportError] = useState("");
+  const [syncError, setSyncError] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [readAt, setReadAt] = useState("");
   const [id, setId] = useState(
-      tasks.find((t) => t.status === "published")?.id || "",
+      tasks.find((t) => t.status === "published")?.id || tasks.find((t) => t.status !== "draft")?.id || "",
     ),
     [offset, setOffset] = useState(0),
     [report, setReport] = useState<any>(null),
@@ -21,19 +27,30 @@ export function TaskReportPanel({
     [loading, setLoading] = useState(false),
     [refresh, setRefresh] = useState(0);
   useEffect(() => {
+    if (id && !tasks.some((task) => task.id === id && task.status !== "draft")) {
+      setId("");
+      setOffset(0);
+    }
+  }, [tasks, id]);
+  useEffect(() => {
+    setError("");
+    setExportError("");
+    setSyncError("");
+    setReport(null);
     if (!id) {
-      setReport(null);
+      setLoading(false);
       return;
     }
     let active = true;
     setLoading(true);
-    setError("");
     api
       .taskReport(id, offset)
       .then(async (value) => {
         if (active) {
           setReport(value);
-          await onDataRefresh?.();
+          setReadAt(new Date().toLocaleString("zh-CN"));
+          try { await onDataRefresh?.(); }
+          catch { if (active) setSyncError("明细已读取，但任务摘要同步失败。可重试同步，当前明细仍可查看。"); }
         }
       })
       .catch((e) => {
@@ -46,8 +63,17 @@ export function TaskReportPanel({
       active = false;
     };
   }, [id, offset, refresh]);
+  const reload = () => { panelRef.current?.focus(); setRefresh(value => value + 1); };
+  const retrySync = async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true; setSyncing(true);
+    panelRef.current?.focus();
+    try { await onDataRefresh?.(); setSyncError(""); }
+    catch { setSyncError("明细已读取，但任务摘要同步失败。可重试同步，当前明细仍可查看。"); }
+    finally { syncingRef.current = false; setSyncing(false); }
+  };
   return (
-    <section className="surface" aria-label="任务成员完成明细">
+    <section ref={panelRef} tabIndex={-1} className="surface" aria-label="任务成员完成明细">
       <div className="section-heading">
         <div>
           <h2>任务成员完成明细</h2>
@@ -56,16 +82,20 @@ export function TaskReportPanel({
         <div className="title-actions">
           <button
             className="button"
-            disabled={loading || exporting || !id}
+            disabled={loading || exporting || syncing || !id}
             onClick={async () => {
+              if (exportingRef.current) return;
+              exportingRef.current = true;
+              panelRef.current?.focus();
               setExporting(true);
-              setError("");
+              setExportError("");
               try {
                 const blob = await api.exportTaskReport(id);
                 downloadBlob(blob, `任务学习明细-${id}.csv`);
               } catch (e) {
-                setError((e as Error).message);
+                setExportError((e as Error).message);
               } finally {
+                exportingRef.current = false;
                 setExporting(false);
               }
             }}
@@ -75,8 +105,8 @@ export function TaskReportPanel({
           </button>
           <button
             className="button"
-            disabled={loading || exporting || !id}
-            onClick={() => setRefresh((v) => v + 1)}
+            disabled={loading || exporting || syncing || !id}
+            onClick={reload}
           >
             <RefreshCw size={16} />
             刷新明细
@@ -86,7 +116,7 @@ export function TaskReportPanel({
       <label className="field" style={{ maxWidth: 480, marginBottom: 18 }}>
         <span>查看任务</span>
         <select
-          disabled={exporting}
+          disabled={exporting || syncing}
           value={id}
           onChange={(e) => {
             setId(e.target.value);
@@ -109,16 +139,19 @@ export function TaskReportPanel({
           {error}
         </div>
       )}
+      {exportError && <div role="alert" className="error-message"><p>导出失败：{exportError}</p><p>可重试导出，当前明细仍可查看。</p></div>}
+      {syncError && <div role="alert" className="error-message"><p>{syncError}</p><button className="button" disabled={syncing} onClick={() => void retrySync()}>{syncing ? "正在同步…" : "重试同步任务摘要"}</button></div>}
       {loading ? (
         <p role="status">正在读取成员学习记录…</p>
-      ) : report ? (
+      ) : error ? <div className="report-recovery"><Empty title="学习明细读取失败" hint="当前任务的学习明细未能读取，请检查连接后重试。" action="重试读取明细" onAction={reload}/>{offset > 0 && <button className="button" onClick={() => {panelRef.current?.focus();setOffset(0);}}>返回第一页</button>}</div> : report ? (
         <>
           <p className="muted info-line">
             当前可见成员 {report.total} 人 · 已记录任务完成 {report.completed}{" "}
             人
+            {readAt && <> · 最近读取：{readAt}</>}
           </p>
           {report.items.length ? (
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="任务学习明细表格">
               <table>
                 <thead>
                   <tr>
@@ -187,17 +220,17 @@ export function TaskReportPanel({
             />
           )}
           <div className="pagination">
-            <span>共 {report.total} 人</span>
+            <span>共 {report.total} 人{report.items.length > 0 ? ` · 第 ${offset + 1}–${offset + report.items.length} 条` : ""}</span>
             <div>
               <button
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - 30))}
+                disabled={loading || exporting || syncing || offset === 0}
+                onClick={() => {panelRef.current?.focus();setOffset(Math.max(0, offset - 30));}}
               >
                 上一页
               </button>
               <button
-                disabled={offset + report.items.length >= report.total}
-                onClick={() => setOffset(offset + 30)}
+                disabled={loading || exporting || syncing || offset + report.items.length >= report.total}
+                onClick={() => {panelRef.current?.focus();setOffset(offset + 30);}}
               >
                 下一页
               </button>
@@ -207,8 +240,8 @@ export function TaskReportPanel({
       ) : (
         !error && (
           <Empty
-            title="选择一个已发布任务"
-            hint="查看指定成员的真实学习完成情况。"
+            title={tasks.some(task => task.status !== 'draft') ? "选择一个任务" : "暂无可查看的任务"}
+            hint={tasks.some(task => task.status !== 'draft') ? "选择已发布或已归档任务，查看成员的学习完成情况。" : "任务发布并分配后，可在这里查看成员的学习完成情况。"}
           />
         )
       )}
