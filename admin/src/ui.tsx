@@ -79,6 +79,7 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  closeDisabled = false,
   footer,
   layout = "dialog",
 }: {
@@ -87,6 +88,7 @@ export function Modal({
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  closeDisabled?: boolean;
   footer?: ReactNode;
   layout?: "dialog" | "workspace";
 }) {
@@ -105,7 +107,12 @@ export function Modal({
           ref.current?.querySelectorAll<HTMLElement>(
             'button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],summary,[tabindex="0"]',
           ) || [],
-        ).filter((el) => el.getClientRects().length);
+        ).filter((el) => !el.matches(':disabled') && el.getClientRects().length);
+        if (!nodes.length) {
+          e.preventDefault();
+          ref.current?.focus();
+          return;
+        }
         const first = nodes[0],
           last = nodes[nodes.length - 1];
         if (!ref.current?.contains(document.activeElement)) {
@@ -154,6 +161,7 @@ export function Modal({
           <button
             className="icon-button"
             aria-label="关闭弹窗"
+            disabled={closeDisabled}
             onClick={onClose}
           >
             <X size={21} />

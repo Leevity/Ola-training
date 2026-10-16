@@ -137,6 +137,9 @@ th,.badge,.course-cell small,.account small,.breadcrumb,.tenant-select select {c
 .dashboard-columns {align-items:start}
 
 .editor-save-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.upload-status { margin-bottom: 16px; }
+.upload-error { margin-top: 16px; font-size: var(--body); }
+.upload-fields .upload-zone:has(input:disabled),.upload-fields input:disabled { cursor: wait; }
 
 .selection-pagination button { color: var(--ink); padding: 0 12px; min-width: 72px; }
 .selection-pagination button:disabled { opacity: .4; }
